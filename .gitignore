@@ -30,3 +30,21 @@ npm-debug.log*
 /platforms
 /plugins
 /www
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Capacitor / Android
+android/.gradle/
+android/app/build/
+android/build/
+android/local.properties
+android/captures/
+android/.idea/
+
+# Capacitor / iOS
+ios/App/Pods/
+ios/App/build/
+ios/DerivedData/
