@@ -101,6 +101,18 @@
           {{ submitting ? 'Processando...' : useGoogleSignup ? 'Assinar com Google' : 'Cadastrar e assinar' }}
         </ion-button>
       </template>
+
+      <WalletCheckoutSheet
+        :is-open="paymentSheetOpen"
+        :username="username"
+        :package-type="selectedPackageType ?? 'cut'"
+        :addon-ids="selectedAddonIds"
+        :amount="monthlyTotal"
+        :plan-label="selectedPlanLabel"
+        :payment-config="profile?.payment_config ?? null"
+        @dismiss="paymentSheetOpen = false"
+        @completed="onPaymentCompleted"
+      />
     </ion-content>
   </ion-page>
 </template>
@@ -108,7 +120,6 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue';
 import { useRouter } from 'vue-router';
-import { Browser } from '@capacitor/browser';
 import {
   IonAvatar,
   IonBackButton,
@@ -139,8 +150,8 @@ import {
   loginWithGoogle,
   register,
   registerWithGoogle,
-  startCheckout,
 } from '@/services/api';
+import WalletCheckoutSheet from '@/components/WalletCheckoutSheet.vue';
 import { initializeGoogleAuth, isGoogleAuthAvailable, signInWithGoogle } from '@/services/googleAuth';
 import type { GoogleTokens } from '@/services/googleAuth';
 import { setAuth } from '@/services/storage';
@@ -159,6 +170,7 @@ const error = ref('');
 const profile = ref<BarbershopProfileResponse | null>(null);
 const selectedPackageType = ref<string | null>(null);
 const selectedAddonIds = ref<number[]>([]);
+const paymentSheetOpen = ref(false);
 
 const form = reactive({
   name: '',
@@ -193,6 +205,18 @@ const monthlyTotal = computed(() => {
 });
 
 const formattedTotal = computed(() => formatCurrency(monthlyTotal.value));
+
+const selectedPlanLabel = computed(() => {
+  if (!profile.value || !selectedPackageType.value) {
+    return 'Plano mensal';
+  }
+
+  const selectedPackage = profile.value.service_plans.packages.find(
+    (pkg) => pkg.type === selectedPackageType.value,
+  );
+
+  return selectedPackage?.label ?? 'Plano mensal';
+});
 
 function toggleAddon(addonId: number, event: CustomEvent) {
   const checked = event.detail.checked as boolean;
@@ -235,28 +259,29 @@ async function startGoogleSignup() {
   }
 }
 
-async function completeCheckout() {
-  if (!selectedPackageType.value) {
-    error.value = 'Selecione um pacote para continuar.';
-    return;
-  }
-
-  const checkout = await startCheckout(
-    props.username,
-    selectedPackageType.value,
-    selectedAddonIds.value,
-  );
-
-  if (checkout.checkout_url) {
-    await Browser.open({ url: checkout.checkout_url });
-  } else {
+async function openPaymentSheet() {
+  if (!profile.value?.mercadopago_configured) {
     const toast = await toastController.create({
-      message: checkout.message ?? 'Cadastro realizado. Pagamento pendente de configuração.',
+      message: 'Cadastro realizado. Pagamento pendente de configuração.',
       duration: 3500,
     });
     await toast.present();
+    await router.replace({ name: 'Home' });
+    return;
   }
 
+  paymentSheetOpen.value = true;
+}
+
+async function onPaymentCompleted(message: string) {
+  paymentSheetOpen.value = false;
+
+  const toast = await toastController.create({
+    message,
+    duration: 3500,
+    color: 'success',
+  });
+  await toast.present();
   await router.replace({ name: 'Home' });
 }
 
@@ -283,7 +308,7 @@ async function submit() {
         barbershop_username: props.username,
       });
       await setAuth(auth.token, auth.user);
-      await completeCheckout();
+      await openPaymentSheet();
       return;
     }
 
@@ -292,7 +317,7 @@ async function submit() {
       barbershop_username: props.username,
     });
     await setAuth(auth.token, auth.user);
-    await completeCheckout();
+    await openPaymentSheet();
   } catch (err) {
     error.value = err instanceof ApiError ? err.message : 'Não foi possível concluir o cadastro.';
   } finally {

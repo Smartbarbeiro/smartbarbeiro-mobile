@@ -1,6 +1,6 @@
 # Smart Barbeiro — App do Cliente (Ionic 8)
 
-App mobile para clientes de barbearias: onboarding, leitura de QR Code, montagem de plano e cadastro com checkout Mercado Pago via API Laravel.
+App mobile para clientes de barbearias: onboarding, leitura de QR Code, montagem de plano e cadastro com pagamento nativo (Google Pay / Apple Pay) ou cartão via Mercado Pago.
 
 ## Pré-requisitos
 
@@ -92,6 +92,12 @@ cd android
 | `POST /api/v1/auth/google/register` | Cadastro Google + CPF + barbearia |
 | `POST /api/v1/auth/register` | Cadastro e-mail/senha |
 | `GET /api/v1/barbearias/{username}` | Perfil e planos |
-| `POST /api/v1/barbearias/{username}/service-plans/checkout` | Checkout Mercado Pago |
+| `POST /api/v1/barbearias/{username}/service-plans/checkout` | Assinatura com `payment` (wallet ou `card_token_id`) |
 
 Autenticação via Bearer token (Laravel Sanctum).
+
+## Pagamentos nativos (Google Pay / Apple Pay)
+
+Após o cadastro, o app abre um modal com **Google Pay** (Android), **Apple Pay** (iOS) ou **cartão** (Mercado Pago Brick) — sem redirecionar para o navegador.
+
+Guia de configuração: [docs/payments-wallet.md](docs/payments-wallet.md)

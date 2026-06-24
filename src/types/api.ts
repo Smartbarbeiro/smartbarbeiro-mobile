@@ -37,11 +37,27 @@ export interface BarbershopProfileResponse {
     addons: ServiceAddon[];
   };
   mercadopago_configured: boolean;
+  payment_config: PaymentConfig | null;
 }
+
+export interface PaymentConfig {
+  public_key: string;
+  currency_id: string;
+  merchant_name: string;
+  apple_pay_merchant_id: string | null;
+  google_pay_merchant_id: string | null;
+  google_pay_gateway: string;
+  google_pay_gateway_merchant_id: string | null;
+  google_pay_environment: string;
+}
+
+export type CheckoutPaymentPayload =
+  | { type: 'card_token'; card_token_id: string }
+  | { type: 'wallet'; wallet_type: 'google_pay' | 'apple_pay'; wallet_token: string };
 
 export interface CheckoutResponse {
   checkout_url: string | null;
-  status: 'checkout' | 'pending';
+  status: 'checkout' | 'pending' | 'authorized';
   message?: string;
 }
 
