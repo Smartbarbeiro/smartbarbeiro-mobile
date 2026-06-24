@@ -9,6 +9,21 @@ export interface GoogleTokens {
 
 let initialized = false;
 let cachedClientId: string | null = null;
+let cachedIosClientId: string | null = null;
+
+function resolveIosClientId(): string | null {
+  if (cachedIosClientId) {
+    return cachedIosClientId;
+  }
+
+  const envIosClientId = import.meta.env.VITE_GOOGLE_IOS_CLIENT_ID as string | undefined;
+  if (envIosClientId) {
+    cachedIosClientId = envIosClientId;
+    return cachedIosClientId;
+  }
+
+  return null;
+}
 
 async function resolveClientId(): Promise<string | null> {
   if (cachedClientId) {
@@ -49,11 +64,26 @@ export async function initializeGoogleAuth(): Promise<void> {
     return;
   }
 
+  const googleConfig: {
+    webClientId: string;
+    mode: 'online';
+    iOSClientId?: string;
+    iOSServerClientId?: string;
+  } = {
+    webClientId: clientId,
+    mode: 'online',
+  };
+
+  if (Capacitor.getPlatform() === 'ios') {
+    const iosClientId = resolveIosClientId();
+    if (iosClientId) {
+      googleConfig.iOSClientId = iosClientId;
+      googleConfig.iOSServerClientId = clientId;
+    }
+  }
+
   await SocialLogin.initialize({
-    google: {
-      webClientId: clientId,
-      mode: 'online',
-    },
+    google: googleConfig,
   });
 
   initialized = true;
@@ -66,6 +96,10 @@ export async function signInWithGoogle(): Promise<GoogleTokens> {
   }
 
   if (Capacitor.isNativePlatform()) {
+    if (Capacitor.getPlatform() === 'ios' && !resolveIosClientId()) {
+      throw new Error('Configure VITE_GOOGLE_IOS_CLIENT_ID para login com Google no iPhone.');
+    }
+
     await initializeGoogleAuth();
 
     const response = await SocialLogin.login({

@@ -21,6 +21,7 @@ Edite `VITE_API_URL` para apontar ao backend:
 | Local (browser) | `http://127.0.0.1:8000` |
 | ngrok | `https://seu-subdominio.ngrok-free.dev` |
 | Android emulator | `http://10.0.2.2:8000` |
+| iPhone (mesma rede) | `http://192.168.x.x:8000` ou tunnel HTTPS |
 | Celular na rede | `http://192.168.x.x:8000` |
 
 O app busca o Google Client ID automaticamente em `GET /api/v1/auth/google/config`. Opcionalmente defina `VITE_GOOGLE_CLIENT_ID` no `.env`.
@@ -35,14 +36,32 @@ npm run dev
 ## Build e Android
 
 ```bash
-npm run build
-npx cap sync android
-npx cap open android
+npm run cap:sync:android
+npm run android:open
 ```
+
+## iPhone / iOS
+
+O projeto iOS está em `ios/`. **Build e execução no iPhone exigem um Mac com Xcode.**
+
+```bash
+npm run cap:sync:ios
+npm run ios:open
+```
+
+Guia completo: [docs/ios-setup.md](docs/ios-setup.md)
+
+Resumo:
+
+1. Configure assinatura no Xcode (Team + bundle `com.smartbarbeiro.client`)
+2. Defina `VITE_GOOGLE_IOS_CLIENT_ID` no `.env` para Google Sign-In
+3. Atualize o URL scheme do Google em `ios/App/App/Info.plist`
+4. Use uma `VITE_API_URL` acessível pelo iPhone (tunnel ou HTTPS)
 
 ### Permissões
 
-- **Câmera** — já configurada em `android/app/src/main/AndroidManifest.xml` para o scanner QR.
+- **Câmera (Android)** — `android/app/src/main/AndroidManifest.xml`
+- **Câmera (iOS)** — `NSCameraUsageDescription` em `ios/App/App/Info.plist`
 
 ### Google Sign-In no Android
 
