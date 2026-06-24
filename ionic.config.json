@@ -1,0 +1,7 @@
+{
+  "name": "smartbarbeiro-mobile",
+  "integrations": {
+    "capacitor": {}
+  },
+  "type": "vue-vite"
+}
