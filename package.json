@@ -5,6 +5,10 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:mobile": "vite --host 0.0.0.0 --port 5173",
+    "android:live": "npm run dev:mobile",
+    "android:run": "npx cap run android",
+    "android:run:live": "npx cap sync android && npx cap run android",
     "build": "vue-tsc && vite build",
     "preview": "vite preview",
     "test:e2e": "cypress run",
