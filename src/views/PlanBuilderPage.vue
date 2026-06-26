@@ -1,7 +1,7 @@
 <template>
   <ion-page>
     <ion-header>
-      <ion-toolbar color="dark">
+      <ion-toolbar>
         <ion-buttons slot="start">
           <ion-back-button default-href="/qr-scan" />
         </ion-buttons>
@@ -260,7 +260,7 @@ async function startGoogleSignup() {
 }
 
 async function openPaymentSheet() {
-  if (!profile.value?.mercadopago_configured) {
+  if (!profile.value?.stripe_configured) {
     const toast = await toastController.create({
       message: 'Cadastro realizado. Pagamento pendente de configuração.',
       duration: 3500,

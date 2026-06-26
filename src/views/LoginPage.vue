@@ -1,7 +1,7 @@
 <template>
   <ion-page>
     <ion-header>
-      <ion-toolbar color="dark">
+      <ion-toolbar>
         <ion-title>Entrar</ion-title>
       </ion-toolbar>
     </ion-header>
@@ -56,6 +56,7 @@
             :disabled="googleLoading"
             @click="loginWithGoogleAccount"
           >
+            <ion-icon slot="start" :icon="logoGoogle" aria-hidden="true" />
             {{ googleLoading ? 'Conectando...' : 'Continuar com Google' }}
           </ion-button>
         </div>
@@ -68,6 +69,7 @@
       </template>
 
       <ion-button expand="block" fill="outline" class="ion-margin-top" @click="goToQrScan">
+        <ion-icon slot="start" :icon="qrCodeOutline" aria-hidden="true" />
         Escanear QR da barbearia
       </ion-button>
     </ion-content>
@@ -92,7 +94,7 @@ import {
   IonToolbar,
   toastController,
 } from '@ionic/vue';
-import { cutOutline } from 'ionicons/icons';
+import { cutOutline, logoGoogle, qrCodeOutline } from 'ionicons/icons';
 import { ApiError, login, loginWithGoogle } from '@/services/api';
 import { initializeGoogleAuth, isGoogleAuthAvailable, signInWithGoogle } from '@/services/googleAuth';
 import { setAuth, getPreferredBarbershop, type PreferredBarbershop } from '@/services/storage';
@@ -215,12 +217,13 @@ async function loginWithGoogleAccount() {
 
 .login-actions {
   display: flex;
+  flex-direction: column;
   gap: 0.75rem;
 }
 
 .login-actions ion-button {
-  flex: 1;
   margin: 0;
+  width: 100%;
 }
 
 .divider {

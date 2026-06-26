@@ -21,6 +21,7 @@
     "android:open": "npx cap open android"
   },
   "dependencies": {
+    "@capacitor-community/stripe": "^8.1.1",
     "@capacitor/android": "^8.4.1",
     "@capacitor/app": "8.1.0",
     "@capacitor/barcode-scanner": "^3.0.2",
@@ -32,11 +33,9 @@
     "@capacitor/keyboard": "8.0.5",
     "@capacitor/preferences": "^8.0.1",
     "@capacitor/status-bar": "8.0.2",
-    "@capgo/capacitor-pay": "^8.1.15",
     "@capgo/capacitor-social-login": "^8.3.30",
     "@ionic/vue": "^8.0.0",
     "@ionic/vue-router": "^8.0.0",
-    "@mercadopago/sdk-js": "^0.0.3",
     "html5-qrcode": "^2.3.8",
     "ionicons": "^7.0.0",
     "vue": "^3.3.0",

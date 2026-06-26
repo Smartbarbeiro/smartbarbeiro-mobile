@@ -1,7 +1,6 @@
 import type {
   ApiUser,
   BarbershopProfileResponse,
-  CheckoutPaymentPayload,
   CheckoutResponse,
   GoogleConfigResponse,
   GoogleRegistrationRequiredResponse,
@@ -157,26 +156,33 @@ export async function fetchBarbershop(username: string): Promise<BarbershopProfi
   return request(`/api/v1/barbearias/${encodeURIComponent(username)}`);
 }
 
-export async function startCheckout(
+export async function prepareCheckout(
   username: string,
   packageType: string,
   addonIds: number[],
-  payment?: CheckoutPaymentPayload,
-): Promise<CheckoutResponse> {
-  const body: Record<string, unknown> = {
-    package_type: packageType,
-    addon_ids: addonIds,
-  };
-
-  if (payment) {
-    body.payment = payment;
-  }
-
+): Promise<import('@/types/api').CheckoutPrepareResponse> {
   return request(
-    `/api/v1/barbearias/${encodeURIComponent(username)}/service-plans/checkout`,
+    `/api/v1/barbearias/${encodeURIComponent(username)}/service-plans/checkout/prepare`,
     {
       method: 'POST',
-      body: JSON.stringify(body),
+      body: JSON.stringify({
+        package_type: packageType,
+        addon_ids: addonIds,
+      }),
+    },
+    true,
+  );
+}
+
+export async function confirmCheckout(
+  username: string,
+  subscriptionId: string,
+): Promise<CheckoutResponse> {
+  return request(
+    `/api/v1/barbearias/${encodeURIComponent(username)}/service-plans/checkout/confirm`,
+    {
+      method: 'POST',
+      body: JSON.stringify({ subscription_id: subscriptionId }),
     },
     true,
   );

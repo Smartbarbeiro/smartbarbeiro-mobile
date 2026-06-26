@@ -36,24 +36,26 @@ export interface BarbershopProfileResponse {
     packages: ServicePackage[];
     addons: ServiceAddon[];
   };
-  mercadopago_configured: boolean;
+  stripe_configured: boolean;
   payment_config: PaymentConfig | null;
 }
 
 export interface PaymentConfig {
-  public_key: string;
-  currency_id: string;
-  merchant_name: string;
+  publishable_key: string;
+  currency: string;
+  merchant_display_name: string;
   apple_pay_merchant_id: string | null;
-  google_pay_merchant_id: string | null;
-  google_pay_gateway: string;
-  google_pay_gateway_merchant_id: string | null;
-  google_pay_environment: string;
+  google_pay_test_env: boolean;
+  stripe_account: string | null;
 }
 
-export type CheckoutPaymentPayload =
-  | { type: 'card_token'; card_token_id: string }
-  | { type: 'wallet'; wallet_type: 'google_pay' | 'apple_pay'; wallet_token: string };
+export interface CheckoutPrepareResponse {
+  customer_id: string;
+  customer_ephemeral_key_secret: string;
+  payment_intent_client_secret: string;
+  subscription_id: string;
+  status: 'requires_payment';
+}
 
 export interface CheckoutResponse {
   checkout_url: string | null;

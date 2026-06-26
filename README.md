@@ -1,6 +1,6 @@
 # Smart Barbeiro — App do Cliente (Ionic 8)
 
-App mobile para clientes de barbearias: onboarding, leitura de QR Code, montagem de plano e cadastro com pagamento nativo (Google Pay / Apple Pay) ou cartão via Mercado Pago.
+App mobile para clientes de barbearias: onboarding, leitura de QR Code, montagem de plano e cadastro com pagamento nativo via Stripe (cartão, Google Pay e Apple Pay).
 
 ## Pré-requisitos
 
@@ -92,12 +92,13 @@ cd android
 | `POST /api/v1/auth/google/register` | Cadastro Google + CPF + barbearia |
 | `POST /api/v1/auth/register` | Cadastro e-mail/senha |
 | `GET /api/v1/barbearias/{username}` | Perfil e planos |
-| `POST /api/v1/barbearias/{username}/service-plans/checkout` | Assinatura com `payment` (wallet ou `card_token_id`) |
+| `POST /api/v1/barbearias/{username}/service-plans/checkout/prepare` | Prepara assinatura Stripe (Payment Sheet) |
+| `POST /api/v1/barbearias/{username}/service-plans/checkout/confirm` | Confirma assinatura após pagamento |
 
 Autenticação via Bearer token (Laravel Sanctum).
 
-## Pagamentos nativos (Google Pay / Apple Pay)
+## Pagamentos (Stripe)
 
-Após o cadastro, o app abre um modal com **Google Pay** (Android), **Apple Pay** (iOS) ou **cartão** (Mercado Pago Brick) — sem redirecionar para o navegador.
+Após o cadastro, o app abre a **Stripe Payment Sheet** com cartão, Google Pay (Android) e Apple Pay (iOS) — sem redirecionar para o navegador.
 
-Guia de configuração: [docs/payments-wallet.md](docs/payments-wallet.md)
+Guia de configuração: [docs/payments-stripe.md](docs/payments-stripe.md)

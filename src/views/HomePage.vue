@@ -1,7 +1,7 @@
 <template>
   <ion-page>
     <ion-header>
-      <ion-toolbar color="dark">
+      <ion-toolbar>
         <ion-title>Minha conta</ion-title>
         <ion-buttons slot="end">
           <ion-button @click="logout">Sair</ion-button>
