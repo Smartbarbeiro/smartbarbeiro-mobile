@@ -4,7 +4,14 @@ const KEYS = {
   token: 'auth_token',
   user: 'auth_user',
   onboardingComplete: 'onboarding_complete',
+  preferredBarbershop: 'preferred_barbershop',
 } as const;
+
+export interface PreferredBarbershop {
+  username: string;
+  name: string;
+  profile_photo_url: string | null;
+}
 
 export async function getToken(): Promise<string | null> {
   const { value } = await Preferences.get({ key: KEYS.token });
@@ -41,4 +48,24 @@ export async function isOnboardingComplete(): Promise<boolean> {
 
 export async function setOnboardingComplete(): Promise<void> {
   await Preferences.set({ key: KEYS.onboardingComplete, value: 'true' });
+}
+
+export async function getPreferredBarbershop(): Promise<PreferredBarbershop | null> {
+  const { value } = await Preferences.get({ key: KEYS.preferredBarbershop });
+  if (!value) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(value) as PreferredBarbershop;
+  } catch {
+    return null;
+  }
+}
+
+export async function setPreferredBarbershop(barbershop: PreferredBarbershop): Promise<void> {
+  await Preferences.set({
+    key: KEYS.preferredBarbershop,
+    value: JSON.stringify(barbershop),
+  });
 }

@@ -68,6 +68,7 @@ import {
 import { Html5Qrcode } from 'html5-qrcode';
 import { ApiError, fetchBarbershop, parseBarbershopUsernameFromQr } from '@/services/api';
 import { ensureCameraPermission } from '@/services/cameraPermission';
+import { setPreferredBarbershop } from '@/services/storage';
 
 const router = useRouter();
 const scannerHost = ref<HTMLElement | null>(null);
@@ -87,7 +88,12 @@ async function openBarbershop(username: string) {
   error.value = '';
 
   try {
-    await fetchBarbershop(username);
+    const barbershop = await fetchBarbershop(username);
+    await setPreferredBarbershop({
+      username: barbershop.profile.username,
+      name: barbershop.profile.name,
+      profile_photo_url: barbershop.profile.profile_photo_url,
+    });
     await stopWebScanner();
     await router.replace({ name: 'PlanBuilder', params: { username } });
   } catch (err) {
