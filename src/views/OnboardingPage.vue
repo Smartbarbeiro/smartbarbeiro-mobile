@@ -1,17 +1,35 @@
 <template>
   <ion-page>
     <ion-content class="onboarding-content" fullscreen>
-      <div class="slide">
-        <ion-icon :icon="currentSlide.icon" class="slide-icon" />
-        <h1>{{ currentSlide.title }}</h1>
-        <p>{{ currentSlide.text }}</p>
-        <div class="dots">
-          <span
-            v-for="(_, index) in slides"
+      <div
+        ref="viewportRef"
+        class="slides-viewport"
+        @scroll.passive="syncActiveIndex"
+      >
+        <div class="slides-track">
+          <section
+            v-for="(slide, index) in slides"
             :key="index"
-            :class="{ active: index === activeIndex }"
-          />
+            class="slide"
+            :aria-hidden="index !== activeIndex"
+          >
+            <ion-icon :icon="slide.icon" class="slide-icon" />
+            <h1>{{ slide.title }}</h1>
+            <p>{{ slide.text }}</p>
+          </section>
         </div>
+      </div>
+
+      <div class="dots">
+        <button
+          v-for="(_, index) in slides"
+          :key="index"
+          type="button"
+          class="dot"
+          :class="{ active: index === activeIndex }"
+          :aria-label="`Ir para o passo ${index + 1}`"
+          @click="scrollToSlide(index)"
+        />
       </div>
 
       <div class="actions ion-padding">
@@ -27,7 +45,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import {
   IonButton,
@@ -39,6 +57,7 @@ import { cutOutline, qrCodeOutline, sparklesOutline } from 'ionicons/icons';
 import { setOnboardingComplete } from '@/services/storage';
 
 const router = useRouter();
+const viewportRef = ref<HTMLElement | null>(null);
 const activeIndex = ref(0);
 
 const slides = [
@@ -59,8 +78,31 @@ const slides = [
   },
 ];
 
-const currentSlide = computed(() => slides[activeIndex.value]);
 const isLastSlide = computed(() => activeIndex.value >= slides.length - 1);
+
+function syncActiveIndex() {
+  const viewport = viewportRef.value;
+
+  if (!viewport || viewport.clientWidth === 0) {
+    return;
+  }
+
+  activeIndex.value = Math.round(viewport.scrollLeft / viewport.clientWidth);
+}
+
+function scrollToSlide(index: number) {
+  const viewport = viewportRef.value;
+
+  if (!viewport) {
+    return;
+  }
+
+  activeIndex.value = index;
+  viewport.scrollTo({
+    left: index * viewport.clientWidth,
+    behavior: 'smooth',
+  });
+}
 
 async function finishOnboarding() {
   await setOnboardingComplete();
@@ -73,12 +115,16 @@ async function continueFlow() {
     return;
   }
 
-  activeIndex.value += 1;
+  scrollToSlide(activeIndex.value + 1);
 }
 
 async function skip() {
   await finishOnboarding();
 }
+
+onMounted(() => {
+  syncActiveIndex();
+});
 </script>
 
 <style scoped>
@@ -86,8 +132,31 @@ async function skip() {
   --background: linear-gradient(180deg, #111827 0%, #1f2937 100%);
 }
 
+.slides-viewport {
+  height: calc(100% - 140px);
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-snap-type: x mandatory;
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.slides-viewport::-webkit-scrollbar {
+  display: none;
+}
+
+.slides-track {
+  display: flex;
+  height: 100%;
+}
+
 .slide {
-  min-height: calc(100% - 120px);
+  flex: 0 0 100%;
+  scroll-snap-align: start;
+  scroll-snap-stop: always;
+  min-height: 100%;
+  box-sizing: border-box;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -115,19 +184,27 @@ async function skip() {
 }
 
 .dots {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 7.5rem;
   display: flex;
+  justify-content: center;
   gap: 0.5rem;
-  margin-top: 2rem;
 }
 
-.dots span {
+.dot {
   width: 0.5rem;
   height: 0.5rem;
   border-radius: 999px;
   background: #4b5563;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  transition: width 0.2s ease, background 0.2s ease;
 }
 
-.dots span.active {
+.dot.active {
   background: #fbbf24;
   width: 1.25rem;
 }

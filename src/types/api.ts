@@ -63,6 +63,17 @@ export interface CheckoutResponse {
   message?: string;
 }
 
+export interface BarbershopSearchResult {
+  username: string;
+  name: string;
+  profile_photo_url: string | null;
+}
+
+export interface BarbershopSearchResponse {
+  profile_base_url: string;
+  results: BarbershopSearchResult[];
+}
+
 export interface GoogleConfigResponse {
   enabled: boolean;
   client_id: string | null;

@@ -1,6 +1,7 @@
 import type {
   ApiUser,
   BarbershopProfileResponse,
+  BarbershopSearchResponse,
   CheckoutResponse,
   GoogleConfigResponse,
   GoogleRegistrationRequiredResponse,
@@ -154,6 +155,16 @@ export async function fetchMe(): Promise<{ user: ApiUser }> {
 
 export async function fetchBarbershop(username: string): Promise<BarbershopProfileResponse> {
   return request(`/api/v1/barbearias/${encodeURIComponent(username)}`);
+}
+
+export function getBarbershopProfileBaseUrl(): string {
+  return `${API_URL.replace(/\/$/, '')}/barbearias/`;
+}
+
+export async function searchBarbershops(query: string): Promise<BarbershopSearchResponse> {
+  const params = new URLSearchParams({ q: query });
+
+  return request(`/api/v1/barbearias/search?${params.toString()}`);
 }
 
 export async function prepareCheckout(

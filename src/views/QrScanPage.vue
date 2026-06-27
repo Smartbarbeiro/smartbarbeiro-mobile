@@ -11,7 +11,7 @@
 
     <ion-content class="ion-padding">
       <p class="hint">
-        Aponte a câmera para o QR Code da barbearia. Você também pode colar o link ou digitar o usuário da barbearia.
+        Aponte a câmera para o QR Code da barbearia. Você também pode colar o link ou digitar o nome da barbearia.
       </p>
 
       <ion-button
@@ -26,10 +26,48 @@
 
       <div v-else ref="scannerHost" class="scanner-host" />
 
-      <ion-item lines="full" class="ion-margin-top">
-        <ion-label position="stacked">Link ou usuário da barbearia</ion-label>
-        <ion-input v-model="manualValue" placeholder="https://.../barbearias/minha-barbearia" />
-      </ion-item>
+      <div class="url-field ion-margin-top">
+        <label class="url-label">Link da barbearia</label>
+        <div class="url-input-row">
+          <span class="url-prefix">{{ profileBaseUrl }}</span>
+          <ion-input
+            class="url-suffix"
+            :value="manualUsername"
+            placeholder="nome-da-barbearia"
+            autocomplete="off"
+            autocorrect="off"
+            spellcheck="false"
+            @ionInput="onUsernameInput"
+            @ionFocus="onUsernameFocus"
+            @ionBlur="onUsernameBlur"
+          />
+        </div>
+        <ul v-if="showSuggestions && suggestions.length" class="suggestions">
+          <li
+            v-for="item in suggestions"
+            :key="item.username"
+            class="suggestion-item"
+            @mousedown.prevent="selectSuggestion(item)"
+          >
+            <ion-avatar slot="start" class="suggestion-avatar">
+              <img
+                v-if="item.profile_photo_url"
+                :src="item.profile_photo_url"
+                :alt="item.name"
+              />
+              <div v-else class="suggestion-avatar-fallback">{{ item.name.charAt(0) }}</div>
+            </ion-avatar>
+            <div class="suggestion-text">
+              <strong>{{ item.name }}</strong>
+              <span>{{ item.username }}</span>
+            </div>
+          </li>
+        </ul>
+        <p v-else-if="showSuggestions && searching" class="suggestions-hint">Buscando barbearias...</p>
+        <p v-else-if="showSuggestions && searchAttempted && !searching" class="suggestions-hint">
+          Nenhuma barbearia encontrada.
+        </p>
+      </div>
 
       <ion-text v-if="error" color="danger">
         <p class="error">{{ error }}</p>
@@ -52,32 +90,125 @@ import {
 import { onBeforeUnmount, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import {
+  IonAvatar,
   IonBackButton,
   IonButton,
   IonButtons,
   IonContent,
   IonHeader,
   IonInput,
-  IonItem,
-  IonLabel,
   IonPage,
   IonText,
   IonTitle,
   IonToolbar,
 } from '@ionic/vue';
 import { Html5Qrcode } from 'html5-qrcode';
-import { ApiError, fetchBarbershop, parseBarbershopUsernameFromQr } from '@/services/api';
+import type { BarbershopSearchResult } from '@/types/api';
+import {
+  ApiError,
+  fetchBarbershop,
+  getBarbershopProfileBaseUrl,
+  parseBarbershopUsernameFromQr,
+  searchBarbershops,
+} from '@/services/api';
 import { ensureCameraPermission } from '@/services/cameraPermission';
 import { setPreferredBarbershop } from '@/services/storage';
 
 const router = useRouter();
 const scannerHost = ref<HTMLElement | null>(null);
-const manualValue = ref('');
+const manualUsername = ref('');
+const profileBaseUrl = ref(getBarbershopProfileBaseUrl());
+const suggestions = ref<BarbershopSearchResult[]>([]);
+const showSuggestions = ref(false);
+const searching = ref(false);
+const searchAttempted = ref(false);
 const error = ref('');
 const scanning = ref(false);
 const isNative = Capacitor.isNativePlatform();
 let scanner: Html5Qrcode | null = null;
 let handled = false;
+let searchTimer: ReturnType<typeof setTimeout> | null = null;
+let blurTimer: ReturnType<typeof setTimeout> | null = null;
+
+function sanitizeUsername(value: string): string {
+  return value.replace(/[^a-zA-Z0-9._-]/g, '');
+}
+
+function extractUsernameFromInput(raw: string): string {
+  const trimmed = raw.trim();
+  const fromUrl = parseBarbershopUsernameFromQr(trimmed);
+  if (fromUrl) {
+    return sanitizeUsername(fromUrl);
+  }
+
+  return sanitizeUsername(trimmed);
+}
+
+function scheduleSearch() {
+  if (searchTimer) {
+    clearTimeout(searchTimer);
+  }
+
+  searchTimer = setTimeout(async () => {
+    const query = manualUsername.value.trim();
+
+    if (query.length < 3) {
+      suggestions.value = [];
+      searchAttempted.value = false;
+      searching.value = false;
+      return;
+    }
+
+    searching.value = true;
+    searchAttempted.value = false;
+
+    try {
+      const response = await searchBarbershops(query);
+      profileBaseUrl.value = response.profile_base_url;
+      suggestions.value = response.results;
+      searchAttempted.value = true;
+    } catch {
+      suggestions.value = [];
+      searchAttempted.value = true;
+    } finally {
+      searching.value = false;
+    }
+  }, 300);
+}
+
+function onUsernameInput(event: CustomEvent) {
+  const raw = (event.detail.value ?? '') as string;
+  manualUsername.value = extractUsernameFromInput(raw);
+  error.value = '';
+  showSuggestions.value = true;
+  scheduleSearch();
+}
+
+function onUsernameFocus() {
+  if (blurTimer) {
+    clearTimeout(blurTimer);
+    blurTimer = null;
+  }
+
+  if (manualUsername.value.trim().length >= 3) {
+    showSuggestions.value = true;
+    scheduleSearch();
+  }
+}
+
+function onUsernameBlur() {
+  blurTimer = setTimeout(() => {
+    showSuggestions.value = false;
+  }, 150);
+}
+
+function selectSuggestion(item: BarbershopSearchResult) {
+  manualUsername.value = item.username;
+  suggestions.value = [];
+  showSuggestions.value = false;
+  searchAttempted.value = false;
+  error.value = '';
+}
 
 async function openBarbershop(username: string) {
   if (handled) {
@@ -103,9 +234,9 @@ async function openBarbershop(username: string) {
 }
 
 async function continueWithManual() {
-  const username = parseBarbershopUsernameFromQr(manualValue.value);
+  const username = manualUsername.value.trim();
   if (!username) {
-    error.value = 'Informe um link ou usuário válido da barbearia.';
+    error.value = 'Informe o nome da barbearia após o link.';
     return;
   }
 
@@ -215,6 +346,14 @@ onMounted(async () => {
 });
 
 onBeforeUnmount(async () => {
+  if (searchTimer) {
+    clearTimeout(searchTimer);
+  }
+
+  if (blurTimer) {
+    clearTimeout(blurTimer);
+  }
+
   await stopWebScanner();
 });
 </script>
@@ -231,6 +370,119 @@ onBeforeUnmount(async () => {
   border-radius: 12px;
   overflow: hidden;
   background: #111827;
+}
+
+.url-field {
+  position: relative;
+}
+
+.url-label {
+  display: block;
+  margin-bottom: 0.35rem;
+  font-size: 0.875rem;
+  color: #6b7280;
+}
+
+.url-input-row {
+  display: flex;
+  align-items: stretch;
+  border: 1px solid #d1d5db;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #fff;
+}
+
+.url-prefix {
+  display: flex;
+  align-items: center;
+  padding: 0 0.65rem;
+  font-size: 0.82rem;
+  color: #6b7280;
+  background: #f3f4f6;
+  border-right: 1px solid #e5e7eb;
+  white-space: nowrap;
+  user-select: none;
+  max-width: 55%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.url-suffix {
+  flex: 1;
+  min-width: 0;
+  --padding-start: 0.65rem;
+  --padding-end: 0.65rem;
+  --background: transparent;
+}
+
+.suggestions {
+  position: absolute;
+  z-index: 10;
+  left: 0;
+  right: 0;
+  margin: 0.35rem 0 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.12);
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.suggestion-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.65rem 0.85rem;
+  cursor: pointer;
+}
+
+.suggestion-item:hover,
+.suggestion-item:active {
+  background: #f3f4f6;
+}
+
+.suggestion-avatar {
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+}
+
+.suggestion-avatar-fallback {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: #e5e7eb;
+  color: #374151;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.suggestion-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.suggestion-text strong {
+  font-size: 0.95rem;
+  color: #111827;
+}
+
+.suggestion-text span {
+  font-size: 0.82rem;
+  color: #6b7280;
+}
+
+.suggestions-hint {
+  margin: 0.35rem 0 0;
+  font-size: 0.82rem;
+  color: #6b7280;
 }
 
 .error {
