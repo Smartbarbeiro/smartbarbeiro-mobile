@@ -36,7 +36,7 @@
             placeholder="nome-da-barbearia"
             autocomplete="off"
             autocorrect="off"
-            spellcheck="false"
+            :spellcheck="false"
             @ionInput="onUsernameInput"
             @ionFocus="onUsernameFocus"
             @ionBlur="onUsernameBlur"
