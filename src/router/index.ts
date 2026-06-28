@@ -32,11 +32,30 @@ const routes: Array<RouteRecordRaw> = [
     name: 'PlanBuilder',
     component: () => import('@/views/PlanBuilderPage.vue'),
     props: true,
+    meta: { requiresAuth: false },
   },
   {
     path: '/home',
     name: 'Home',
     component: () => import('@/views/HomePage.vue'),
+    meta: { requiresAuth: true },
+  },
+  {
+    path: '/subscriptions',
+    name: 'Subscriptions',
+    component: () => import('@/views/SubscriptionsPage.vue'),
+    meta: { requiresAuth: true },
+  },
+  {
+    path: '/haircuts',
+    name: 'Haircuts',
+    component: () => import('@/views/HaircutsPage.vue'),
+    meta: { requiresAuth: true },
+  },
+  {
+    path: '/profile',
+    name: 'ProfileSettings',
+    component: () => import('@/views/ProfileSettingsPage.vue'),
     meta: { requiresAuth: true },
   },
 ];

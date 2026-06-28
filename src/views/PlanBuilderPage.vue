@@ -1,106 +1,221 @@
 <template>
   <ion-page>
-    <ion-header>
-      <ion-toolbar>
-        <ion-buttons slot="start">
-          <ion-back-button default-href="/qr-scan" />
-        </ion-buttons>
-        <ion-title>Montar plano</ion-title>
-      </ion-toolbar>
-    </ion-header>
-
-    <ion-content class="ion-padding">
+    <ion-content class="sb-page-light" :class="{ 'sb-content-with-tabs': showTabBar }">
       <ion-spinner v-if="loading" name="crescent" class="center-spinner" />
 
-      <template v-else-if="profile">
-        <div class="shop-header">
-          <ion-avatar>
-            <img v-if="profile.profile.profile_photo_url" :src="profile.profile.profile_photo_url" alt="" />
-            <div v-else class="avatar-fallback">{{ initials }}</div>
-          </ion-avatar>
-          <div>
-            <h2>{{ profile.profile.name }}</h2>
-            <p>@{{ profile.profile.username }}</p>
-          </div>
+      <div v-else-if="profile" class="barbershop-profile-page">
+        <div class="barbershop-profile-header" aria-hidden="true" />
+
+        <div class="barbershop-profile-main">
+          <ProfileAvatar
+            :name="profile.profile.name"
+            :photo-url="profilePhotoUrl"
+            size="lg"
+          />
+          <h1 class="barbershop-profile-name">{{ profile.profile.name }}</h1>
+          <p class="barbershop-profile-meta">@{{ profile.profile.username }}</p>
         </div>
 
-        <h3 class="section-title">Escolha o pacote</h3>
-        <ion-list>
-          <ion-radio-group v-model="selectedPackageType">
-            <ion-item v-for="pkg in profile.service_plans.packages" :key="pkg.type">
-              <ion-radio slot="start" :value="pkg.type" />
-              <ion-label>
-                <h2>{{ pkg.label }}</h2>
-                <p>{{ pkg.formatted_price }}/mês</p>
-              </ion-label>
-            </ion-item>
-          </ion-radio-group>
-        </ion-list>
+        <section class="plan-builder">
+          <form class="plan-form" @submit.prevent="handlePlanSubmit">
+            <template v-if="!checkoutStep">
+              <fieldset>
+                <legend class="visually-hidden">Escolha seu plano mensal</legend>
+                <div class="plan-packages-row">
+                  <div v-for="pkg in profile.service_plans.packages" :key="pkg.type">
+                    <input
+                      :id="`package-${pkg.type}`"
+                      v-model="selectedPackageType"
+                      class="radioBtn"
+                      name="servico"
+                      type="radio"
+                      :value="pkg.type"
+                    />
+                    <label :for="`package-${pkg.type}`" class="plan-card">
+                      <div class="plan-card-body">
+                        <ServicePlanIcon :variant="pkg.type === 'cut' ? 'cut' : 'cut_beard'" />
+                        <p v-if="pkg.type === 'cut'">
+                          <strong>CORTE<br />CABELO</strong>
+                        </p>
+                        <p v-else>
+                          <strong>CORTE CABELO<br /><span class="underline">+ BARBA</span></strong>
+                        </p>
+                        <p class="plan-card-price">{{ pkg.formatted_price }}/mês</p>
+                      </div>
+                      <div class="plan-card-footer">ILIMITADOS</div>
+                    </label>
+                  </div>
+                </div>
+              </fieldset>
 
-        <template v-if="profile.service_plans.addons.length">
-          <h3 class="section-title">Adicionais</h3>
-          <ion-list>
-            <ion-item v-for="addon in profile.service_plans.addons" :key="addon.id">
-              <ion-checkbox slot="start" :checked="selectedAddonIds.includes(addon.id)" @ionChange="toggleAddon(addon.id, $event)" />
-              <ion-label>
-                <h2>{{ addon.label }}</h2>
-                <p>+ {{ addon.formatted_price }}/mês</p>
-              </ion-label>
-            </ion-item>
-          </ion-list>
-        </template>
+              <button
+                v-if="availableAddons.length > 0 && !showAddons"
+                type="button"
+                class="og-btn og-btn--secondary btn-optionals"
+                @click="showAddons = true"
+              >
+                <span class="og-btn__label">+ ADICIONAR OPCIONAIS</span>
+              </button>
 
-        <ion-card>
-          <ion-card-content>
-            <strong>Total mensal:</strong> {{ formattedTotal }}
-          </ion-card-content>
-        </ion-card>
+              <div v-if="showAddons && availableAddons.length > 0" class="plan-addons-panel">
+                <p class="fw-semibold mb-3"><strong>Opcionais disponíveis</strong></p>
+                <label
+                  v-for="addon in availableAddons"
+                  :key="addon.id"
+                  class="plan-addon-item"
+                  :for="`addon-${addon.id}`"
+                >
+                  <input
+                    :id="`addon-${addon.id}`"
+                    type="checkbox"
+                    :checked="selectedAddonIds.includes(addon.id)"
+                    @change="toggleAddon(addon.id, ($event.target as HTMLInputElement).checked)"
+                  />
+                  <span>
+                    {{ addon.label }}
+                    <span class="text-muted">({{ addon.formatted_price }}/mês)</span>
+                  </span>
+                </label>
+              </div>
 
-        <h3 class="section-title">Seus dados</h3>
+              <button type="submit" class="og-btn og-btn--primary btn-plan-submit">
+                <span class="og-btn__label">{{ planBuilderSubmitLabel }}</span>
+              </button>
 
-        <ion-button
-          v-if="googleEnabled && !useGoogleSignup"
-          expand="block"
-          fill="outline"
-          color="medium"
-          :disabled="googleLoading"
-          class="ion-margin-bottom"
-          @click="startGoogleSignup"
-        >
-          {{ googleLoading ? 'Conectando...' : 'Cadastrar com Google' }}
-        </ion-button>
+              <p v-if="!isAuthenticated" class="plan-guest-login">
+                Já tem uma conta,
+                <button type="button" @click="goToLogin">entre aqui</button>
+              </p>
+            </template>
 
-        <ion-item lines="full">
-          <ion-label position="stacked">Nome</ion-label>
-          <ion-input v-model="form.name" autocomplete="name" :readonly="useGoogleSignup" />
-        </ion-item>
-        <ion-item lines="full">
-          <ion-label position="stacked">CPF</ion-label>
-          <ion-input v-model="form.cpf" inputmode="numeric" />
-        </ion-item>
-        <ion-item lines="full">
-          <ion-label position="stacked">E-mail</ion-label>
-          <ion-input v-model="form.email" type="email" autocomplete="email" :readonly="useGoogleSignup" />
-        </ion-item>
-        <template v-if="!useGoogleSignup">
-          <ion-item lines="full">
-            <ion-label position="stacked">Senha</ion-label>
-            <ion-input v-model="form.password" type="password" autocomplete="new-password" />
-          </ion-item>
-          <ion-item lines="full">
-            <ion-label position="stacked">Confirmar senha</ion-label>
-            <ion-input v-model="form.password_confirmation" type="password" autocomplete="new-password" />
-          </ion-item>
-        </template>
+            <div v-if="checkoutStep === 'summary' && selectedPackage" class="plan-checkout">
+              <button type="button" class="og-btn og-btn--neutral back-button" @click="editPlan">
+                <span class="og-btn__label">← Voltar</span>
+              </button>
 
-        <ion-text v-if="error" color="danger">
-          <p class="error">{{ error }}</p>
-        </ion-text>
+              <div class="perfil-barbearia mt-4">
+                <ProfileAvatar
+                  :name="profile.profile.name"
+                  :photo-url="profilePhotoUrl"
+                  size="md"
+                />
+                <div class="perfil-info">
+                  <h3 class="barbershop-profile-name mb-1">{{ profile.profile.name }}</h3>
+                  <p class="barbershop-profile-meta mb-0">@{{ profile.profile.username }}</p>
+                </div>
+              </div>
 
-        <ion-button expand="block" class="ion-margin-top" :disabled="submitting" @click="submit">
-          {{ submitting ? 'Processando...' : useGoogleSignup ? 'Assinar com Google' : 'Cadastrar e assinar' }}
-        </ion-button>
-      </template>
+              <div class="carrinho-items mt-4">
+                <h3 class="h6 fw-bold mb-3"><strong>Resumo do plano</strong></h3>
+                <ul>
+                  <li>{{ selectedPackage.label }} — ilimitados</li>
+                  <li v-for="addon in selectedAddons" :key="addon.id" class="text-muted">
+                    {{ addon.label }} — {{ addon.formatted_price }}/mês
+                  </li>
+                  <li v-if="selectedAddons.length === 0" class="text-muted">Nenhum opcional selecionado</li>
+                </ul>
+              </div>
+
+              <div class="carrinho-total">
+                <p class="h5 fw-bold mb-0">Total: {{ formattedTotal }}/mês</p>
+              </div>
+
+              <button type="button" class="og-btn og-btn--primary" @click="goToPayment">
+                <span class="og-btn__label">CONTINUAR PARA PAGAMENTO</span>
+              </button>
+            </div>
+
+            <div v-if="checkoutStep === 'payment' && selectedPackage" class="plan-checkout plan-payment">
+              <button type="button" class="og-btn og-btn--neutral back-button" @click="backToSummary">
+                <span class="og-btn__label">← Voltar</span>
+              </button>
+
+              <div class="carrinho-total mb-4">
+                <p class="h6 fw-bold mb-1">Total do plano</p>
+                <p class="h5 fw-bold mb-0">{{ formattedTotal }}/mês</p>
+              </div>
+
+              <p class="h6 fw-bold mb-3"><strong>Método de Pagamento</strong></p>
+
+              <button
+                type="button"
+                class="card-pagamento"
+                :class="{ 'card-pagamento--selected': paymentMethod === 'card' }"
+                @click="paymentMethod = 'card'"
+              >
+                <h3 class="h6 fw-bold mb-3">Cartão, Google Pay e Apple Pay</h3>
+                <img :src="cardImageUrl" alt="Cartão" class="service-pix" />
+              </button>
+
+              <div v-if="!isAuthenticated" class="mt-4">
+                <p class="h6 fw-bold mb-3"><strong>Crie sua conta para assinar</strong></p>
+
+                <button
+                  v-if="googleEnabled && !useGoogleSignup"
+                  type="button"
+                  class="oauth-google-btn mb-3"
+                  :disabled="googleLoading"
+                  @click="startGoogleSignup"
+                >
+                  <span class="oauth-google-btn__icon">G</span>
+                  {{ googleLoading ? 'Conectando...' : 'Cadastrar com Google' }}
+                </button>
+
+                <div class="sb-form-field">
+                  <label class="sb-form-label" for="name">Nome</label>
+                  <input id="name" v-model="form.name" class="sb-form-control" autocomplete="name" :readonly="useGoogleSignup" />
+                </div>
+                <div class="sb-form-field">
+                  <label class="sb-form-label" for="cpf">CPF</label>
+                  <input id="cpf" v-model="form.cpf" class="sb-form-control" inputmode="numeric" />
+                </div>
+                <div class="sb-form-field">
+                  <label class="sb-form-label" for="email">E-mail</label>
+                  <input id="email" v-model="form.email" class="sb-form-control" type="email" autocomplete="email" :readonly="useGoogleSignup" />
+                </div>
+                <template v-if="!useGoogleSignup">
+                  <div class="sb-form-field">
+                    <label class="sb-form-label" for="password">Senha</label>
+                    <input id="password" v-model="form.password" class="sb-form-control" type="password" autocomplete="new-password" />
+                  </div>
+                  <div class="sb-form-field">
+                    <label class="sb-form-label" for="password_confirmation">Confirmar senha</label>
+                    <input
+                      id="password_confirmation"
+                      v-model="form.password_confirmation"
+                      class="sb-form-control"
+                      type="password"
+                      autocomplete="new-password"
+                    />
+                  </div>
+                </template>
+              </div>
+
+              <p v-if="error" class="sb-alert sb-alert-danger mt-3">{{ error }}</p>
+
+              <button
+                v-if="paymentMethod"
+                type="button"
+                class="og-btn og-btn--primary mt-4"
+                :disabled="submitting || !profile.stripe_configured"
+                @click="confirmPayment"
+              >
+                <span class="og-btn__label">
+                  {{ submitting ? 'PROCESSANDO...' : 'CONFIRMAR PAGAMENTO' }}
+                </span>
+              </button>
+
+              <p v-if="!profile.stripe_configured" class="text-muted mt-3">
+                Pagamentos indisponíveis no momento.
+              </p>
+            </div>
+          </form>
+        </section>
+      </div>
+
+      <p v-else-if="error" class="sb-alert sb-alert-danger">{{ error }}</p>
+
+      <ClientTabBar v-if="showTabBar" />
 
       <WalletCheckoutSheet
         :is-open="paymentSheetOpen"
@@ -120,29 +235,12 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue';
 import { useRouter } from 'vue-router';
-import {
-  IonAvatar,
-  IonBackButton,
-  IonButton,
-  IonButtons,
-  IonCard,
-  IonCardContent,
-  IonCheckbox,
-  IonContent,
-  IonHeader,
-  IonInput,
-  IonItem,
-  IonLabel,
-  IonList,
-  IonPage,
-  IonRadio,
-  IonRadioGroup,
-  IonSpinner,
-  IonText,
-  IonTitle,
-  IonToolbar,
-  toastController,
-} from '@ionic/vue';
+import { IonContent, IonPage, IonSpinner, toastController } from '@ionic/vue';
+import cardImageUrl from '@/assets/images/cartao.svg';
+import ClientTabBar from '@/components/ClientTabBar.vue';
+import ProfileAvatar from '@/components/ProfileAvatar.vue';
+import ServicePlanIcon from '@/components/ServicePlanIcon.vue';
+import WalletCheckoutSheet from '@/components/WalletCheckoutSheet.vue';
 import {
   ApiError,
   fetchBarbershop,
@@ -150,11 +248,11 @@ import {
   loginWithGoogle,
   register,
   registerWithGoogle,
+  resolveApiAssetUrl,
 } from '@/services/api';
-import WalletCheckoutSheet from '@/components/WalletCheckoutSheet.vue';
 import { initializeGoogleAuth, isGoogleAuthAvailable, signInWithGoogle } from '@/services/googleAuth';
 import type { GoogleTokens } from '@/services/googleAuth';
-import { setAuth } from '@/services/storage';
+import { getToken, setAuth } from '@/services/storage';
 import type { BarbershopProfileResponse } from '@/types/api';
 
 const props = defineProps<{ username: string }>();
@@ -166,10 +264,15 @@ const googleLoading = ref(false);
 const googleEnabled = ref(false);
 const useGoogleSignup = ref(false);
 const googleTokens = ref<GoogleTokens | null>(null);
+const isAuthenticated = ref(false);
+const showTabBar = ref(false);
 const error = ref('');
 const profile = ref<BarbershopProfileResponse | null>(null);
 const selectedPackageType = ref<string | null>(null);
 const selectedAddonIds = ref<number[]>([]);
+const showAddons = ref(false);
+const checkoutStep = ref<'summary' | 'payment' | null>(null);
+const paymentMethod = ref<'card' | null>(null);
 const paymentSheetOpen = ref(false);
 
 const form = reactive({
@@ -180,52 +283,72 @@ const form = reactive({
   password_confirmation: '',
 });
 
-const initials = computed(() => {
-  const name = profile.value?.profile.name ?? '';
-  return name
-    .split(' ')
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase() ?? '')
-    .join('');
-});
+const profilePhotoUrl = computed(() => resolveApiAssetUrl(profile.value?.profile.profile_photo_url));
+
+const availableAddons = computed(() => profile.value?.service_plans.addons ?? []);
+
+const selectedPackage = computed(() =>
+  profile.value?.service_plans.packages.find((pkg) => pkg.type === selectedPackageType.value),
+);
+
+const selectedAddons = computed(() =>
+  availableAddons.value.filter((addon) => selectedAddonIds.value.includes(addon.id)),
+);
 
 const monthlyTotal = computed(() => {
   if (!profile.value || !selectedPackageType.value) {
     return 0;
   }
 
-  const selectedPackage = profile.value.service_plans.packages.find(
-    (pkg) => pkg.type === selectedPackageType.value,
-  );
-  const addonsTotal = profile.value.service_plans.addons
-    .filter((addon) => selectedAddonIds.value.includes(addon.id))
-    .reduce((sum, addon) => sum + addon.monthly_price, 0);
+  const base = selectedPackage.value?.monthly_price ?? 0;
+  const addons = selectedAddons.value.reduce((sum, addon) => sum + addon.monthly_price, 0);
 
-  return (selectedPackage?.monthly_price ?? 0) + addonsTotal;
+  return base + addons;
 });
 
 const formattedTotal = computed(() => formatCurrency(monthlyTotal.value));
 
-const selectedPlanLabel = computed(() => {
-  if (!profile.value || !selectedPackageType.value) {
-    return 'Plano mensal';
-  }
+const selectedPlanLabel = computed(() => selectedPackage.value?.label ?? 'Plano mensal');
 
-  const selectedPackage = profile.value.service_plans.packages.find(
-    (pkg) => pkg.type === selectedPackageType.value,
-  );
+const planBuilderSubmitLabel = computed(() => (isAuthenticated.value ? 'ALTERE SEU PLANO' : 'MONTE SEU PLANO'));
 
-  return selectedPackage?.label ?? 'Plano mensal';
-});
-
-function toggleAddon(addonId: number, event: CustomEvent) {
-  const checked = event.detail.checked as boolean;
+function toggleAddon(addonId: number, checked: boolean) {
   if (checked) {
     selectedAddonIds.value = [...new Set([...selectedAddonIds.value, addonId])];
     return;
   }
 
   selectedAddonIds.value = selectedAddonIds.value.filter((id) => id !== addonId);
+}
+
+function handlePlanSubmit() {
+  if (!selectedPackageType.value) {
+    error.value = 'Selecione um pacote para continuar.';
+    return;
+  }
+
+  error.value = '';
+  checkoutStep.value = 'summary';
+}
+
+function editPlan() {
+  checkoutStep.value = null;
+  paymentMethod.value = null;
+  error.value = '';
+}
+
+function goToPayment() {
+  checkoutStep.value = 'payment';
+}
+
+function backToSummary() {
+  paymentMethod.value = null;
+  checkoutStep.value = 'summary';
+  error.value = '';
+}
+
+async function goToLogin() {
+  await router.push({ name: 'Login', query: { redirect: props.username } });
 }
 
 async function startGoogleSignup() {
@@ -246,12 +369,13 @@ async function startGoogleSignup() {
 
     const authResponse = response as { token: string; user: import('@/types/api').ApiUser };
     await setAuth(authResponse.token, authResponse.user);
+    isAuthenticated.value = true;
+    showTabBar.value = true;
     const toast = await toastController.create({
-      message: 'Você já possui conta. Redirecionando...',
+      message: 'Conta encontrada. Continue o pagamento.',
       duration: 2500,
     });
     await toast.present();
-    await router.replace({ name: 'Home' });
   } catch (err) {
     error.value = err instanceof ApiError ? err.message : err instanceof Error ? err.message : 'Não foi possível conectar com Google.';
   } finally {
@@ -259,18 +383,65 @@ async function startGoogleSignup() {
   }
 }
 
-async function openPaymentSheet() {
-  if (!profile.value?.stripe_configured) {
-    const toast = await toastController.create({
-      message: 'Cadastro realizado. Pagamento pendente de configuração.',
-      duration: 3500,
+async function ensureRegistered(): Promise<boolean> {
+  if (isAuthenticated.value) {
+    return true;
+  }
+
+  if (useGoogleSignup.value) {
+    if (!googleTokens.value) {
+      error.value = 'Conecte com Google antes de continuar.';
+      return false;
+    }
+
+    const auth = await registerWithGoogle({
+      ...googleTokens.value,
+      name: form.name,
+      cpf: form.cpf,
+      barbershop_username: props.username,
     });
-    await toast.present();
-    await router.replace({ name: 'Home' });
+    await setAuth(auth.token, auth.user);
+    isAuthenticated.value = true;
+    showTabBar.value = true;
+    return true;
+  }
+
+  const auth = await register({
+    ...form,
+    barbershop_username: props.username,
+  });
+  await setAuth(auth.token, auth.user);
+  isAuthenticated.value = true;
+  showTabBar.value = true;
+  return true;
+}
+
+async function confirmPayment() {
+  if (!paymentMethod.value) {
+    error.value = 'Selecione um método de pagamento.';
     return;
   }
 
-  paymentSheetOpen.value = true;
+  submitting.value = true;
+  error.value = '';
+
+  try {
+    const registered = await ensureRegistered();
+    if (!registered) {
+      return;
+    }
+
+    if (!profile.value?.stripe_configured) {
+      error.value = 'Pagamentos indisponíveis no momento.';
+      return;
+    }
+
+    paymentSheetOpen.value = true;
+  } catch (err) {
+    error.value = err instanceof ApiError ? err.message : 'Não foi possível concluir o cadastro.';
+  } finally {
+    submitting.value = false;
+  }
 }
 
 async function onPaymentCompleted(message: string) {
@@ -285,47 +456,9 @@ async function onPaymentCompleted(message: string) {
   await router.replace({ name: 'Home' });
 }
 
-async function submit() {
-  if (!selectedPackageType.value) {
-    error.value = 'Selecione um pacote para continuar.';
-    return;
-  }
-
-  submitting.value = true;
-  error.value = '';
-
-  try {
-    if (useGoogleSignup.value) {
-      if (!googleTokens.value) {
-        error.value = 'Conecte com Google antes de continuar.';
-        return;
-      }
-
-      const auth = await registerWithGoogle({
-        ...googleTokens.value,
-        name: form.name,
-        cpf: form.cpf,
-        barbershop_username: props.username,
-      });
-      await setAuth(auth.token, auth.user);
-      await openPaymentSheet();
-      return;
-    }
-
-    const auth = await register({
-      ...form,
-      barbershop_username: props.username,
-    });
-    await setAuth(auth.token, auth.user);
-    await openPaymentSheet();
-  } catch (err) {
-    error.value = err instanceof ApiError ? err.message : 'Não foi possível concluir o cadastro.';
-  } finally {
-    submitting.value = false;
-  }
-}
-
 onMounted(async () => {
+  isAuthenticated.value = !!(await getToken());
+  showTabBar.value = isAuthenticated.value;
   googleEnabled.value = await isGoogleAuthAvailable();
   await initializeGoogleAuth();
 
@@ -346,39 +479,56 @@ onMounted(async () => {
   margin: 4rem auto;
 }
 
-.shop-header {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  margin-bottom: 1.5rem;
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
-.shop-header h2 {
-  margin: 0;
+.underline {
+  text-decoration: underline;
 }
 
-.shop-header p {
-  margin: 0;
+.text-muted {
   color: #6b7280;
 }
 
-.avatar-fallback {
-  width: 100%;
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: #111827;
-  color: #fff;
-  font-weight: 700;
+.back-button {
+  margin-top: 0.5rem;
 }
 
-.section-title {
-  margin: 1.5rem 0 0.5rem;
-  font-size: 1rem;
+.fw-semibold {
+  font-weight: 600;
 }
 
-.error {
+.h5,
+.h6 {
+  margin: 0;
+}
+
+.mt-3 {
+  margin-top: 0.75rem;
+}
+
+.mt-4 {
   margin-top: 1rem;
+}
+
+.mb-1 {
+  margin-bottom: 0.25rem;
+}
+
+.mb-3 {
+  margin-bottom: 0.75rem;
+}
+
+.mb-4 {
+  margin-bottom: 1rem;
 }
 </style>

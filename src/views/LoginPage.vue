@@ -1,138 +1,96 @@
 <template>
   <ion-page>
-    <ion-header>
-      <ion-toolbar>
-        <ion-title>Entrar</ion-title>
-      </ion-toolbar>
-    </ion-header>
-
     <ion-content class="login-content">
-      <div class="login-shell ion-padding">
-        <div class="login-main">
-          <div class="brand">
-            <template v-if="preferredBarbershop">
-              <ion-avatar class="shop-avatar">
-                <img
-                  v-if="preferredBarbershop.profile_photo_url"
-                  :src="preferredBarbershop.profile_photo_url"
-                  alt=""
-                />
-                <div v-else class="avatar-fallback">{{ barbershopInitials }}</div>
-              </ion-avatar>
-              <h1>{{ preferredBarbershop.name }}</h1>
-              <p>Acesse sua conta de cliente</p>
-            </template>
-            <template v-else>
-              <img :src="logoImage" class="brand-logo" alt="Smart Barbeiro" />
-              <h1>Smart Barbeiro</h1>
-              <p>Acesse sua conta de cliente</p>
-            </template>
+      <div class="register-hero">
+        <div class="register-hero__inner">
+          <div class="login-panel">
+            <header class="login-panel__header">
+              <h1 class="login-panel__title">Entrar</h1>
+              <p class="login-panel__subtitle">Acesse sua conta para gerenciar sua barbearia.</p>
+            </header>
+
+            <button
+              v-if="googleEnabled"
+              type="button"
+              class="oauth-google-btn mb-3"
+              :disabled="googleLoading"
+              @click="loginWithGoogleAccount"
+            >
+              <span class="oauth-google-btn__icon">G</span>
+              {{ googleLoading ? 'Conectando...' : 'Continuar com Google' }}
+            </button>
+
+            <p v-if="googleEnabled" class="oauth-divider">ou entre com e-mail</p>
+
+            <form class="login-panel__form" @submit.prevent="submit">
+              <div class="sb-form-field">
+                <label class="sb-form-label" for="email">E-mail</label>
+                <input id="email" v-model="email" class="sb-form-control" type="email" autocomplete="email" required />
+              </div>
+
+              <div class="sb-form-field">
+                <label class="sb-form-label" for="password">Senha</label>
+                <div class="password-row">
+                  <input
+                    id="password"
+                    v-model="password"
+                    class="sb-form-control"
+                    :type="showPassword ? 'text' : 'password'"
+                    autocomplete="current-password"
+                    required
+                  />
+                  <button type="button" class="password-toggle" @click="showPassword = !showPassword">
+                    {{ showPassword ? 'Ocultar' : 'Mostrar' }}
+                  </button>
+                </div>
+              </div>
+
+              <p v-if="error" class="sb-alert sb-alert-danger">{{ error }}</p>
+
+              <button type="submit" class="sb-btn-dark" :disabled="loading">
+                {{ loading ? 'Entrando...' : 'Entrar' }}
+              </button>
+            </form>
+
+            <p class="login-panel__footer">
+              Não tem conta?
+              <button type="button" class="link-button" @click="goToQrScan">Escanear QR da barbearia</button>
+            </p>
           </div>
 
-          <form @submit.prevent="submit">
-            <ion-item lines="full">
-              <ion-label position="stacked">E-mail</ion-label>
-              <ion-input v-model="email" type="email" autocomplete="email" required />
-            </ion-item>
-
-            <ion-item lines="full">
-              <ion-label position="stacked">Senha</ion-label>
-              <ion-input v-model="password" type="password" autocomplete="current-password" required />
-            </ion-item>
-
-            <ion-text v-if="error" color="danger">
-              <p class="error">{{ error }}</p>
-            </ion-text>
-
-            <div class="login-actions ion-margin-top">
-              <ion-button expand="block" type="submit" :disabled="loading">
-                {{ loading ? 'Entrando...' : 'Entrar' }}
-              </ion-button>
-
-              <ion-button
-                v-if="googleEnabled"
-                expand="block"
-                type="button"
-                fill="outline"
-                color="medium"
-                :disabled="googleLoading"
-                @click="loginWithGoogleAccount"
-              >
-                <ion-icon slot="start" :icon="logoGoogle" aria-hidden="true" />
-                {{ googleLoading ? 'Conectando...' : 'Continuar com Google' }}
-              </ion-button>
-            </div>
-          </form>
-
-          <template v-if="googleEnabled">
-            <div class="divider">
-              <span>ou</span>
-            </div>
-          </template>
-
-          <ion-button expand="block" fill="outline" class="ion-margin-top" @click="goToQrScan">
-            <ion-icon slot="start" :icon="qrCodeOutline" aria-hidden="true" />
-            Escanear QR da barbearia
-          </ion-button>
+          <footer class="login-footer">
+            <button type="button" class="footer-logo-button" @click="showSupportOptions">
+              <img :src="logoImage" class="footer-logo" alt="Smart Barbeiro" />
+            </button>
+          </footer>
         </div>
-
-        <footer class="login-footer">
-          <button type="button" class="footer-logo-button" @click="showSupportOptions">
-            <img :src="logoImage" class="footer-logo" alt="Smart Barbeiro" />
-          </button>
-        </footer>
       </div>
     </ion-content>
   </ion-page>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
-import { useRouter } from 'vue-router';
-import {
-  IonAvatar,
-  IonButton,
-  IonContent,
-  IonHeader,
-  IonIcon,
-  IonInput,
-  IonItem,
-  IonLabel,
-  IonPage,
-  IonText,
-  IonTitle,
-  IonToolbar,
-  actionSheetController,
-  toastController,
-} from '@ionic/vue';
+import { onMounted, ref } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
+import { IonContent, IonPage, actionSheetController, toastController } from '@ionic/vue';
 import { Browser } from '@capacitor/browser';
-import { logoGoogle, qrCodeOutline } from 'ionicons/icons';
 import logoImage from '@/assets/logo.png';
 import { SUPPORT_WEBSITE_URL, supportPhoneDialUrl } from '@/config/support';
 import { ApiError, login, loginWithGoogle } from '@/services/api';
 import { initializeGoogleAuth, isGoogleAuthAvailable, signInWithGoogle } from '@/services/googleAuth';
-import { setAuth, getPreferredBarbershop, type PreferredBarbershop } from '@/services/storage';
+import { setAuth } from '@/services/storage';
 
 const router = useRouter();
+const route = useRoute();
 const email = ref('');
 const password = ref('');
+const showPassword = ref(false);
 const loading = ref(false);
 const googleLoading = ref(false);
 const googleEnabled = ref(false);
 const error = ref('');
-const preferredBarbershop = ref<PreferredBarbershop | null>(null);
-
-const barbershopInitials = computed(() => {
-  const name = preferredBarbershop.value?.name ?? '';
-  return name
-    .split(' ')
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase() ?? '')
-    .join('');
-});
 
 onMounted(async () => {
-  preferredBarbershop.value = await getPreferredBarbershop();
   googleEnabled.value = await isGoogleAuthAvailable();
   await initializeGoogleAuth();
 });
@@ -144,6 +102,13 @@ async function submit() {
   try {
     const response = await login(email.value.trim(), password.value);
     await setAuth(response.token, response.user);
+
+    const redirectUsername = route.query.redirect as string | undefined;
+    if (redirectUsername) {
+      await router.replace({ name: 'PlanBuilder', params: { username: redirectUsername } });
+      return;
+    }
+
     await router.replace({ name: 'Home' });
   } catch (err) {
     error.value = err instanceof ApiError ? err.message : 'Não foi possível entrar.';
@@ -221,6 +186,13 @@ async function loginWithGoogleAccount() {
 
     const authResponse = response as { token: string; user: import('@/types/api').ApiUser };
     await setAuth(authResponse.token, authResponse.user);
+
+    const redirectUsername = route.query.redirect as string | undefined;
+    if (redirectUsername) {
+      await router.replace({ name: 'PlanBuilder', params: { username: redirectUsername } });
+      return;
+    }
+
     await router.replace({ name: 'Home' });
   } catch (err) {
     error.value = err instanceof ApiError ? err.message : err instanceof Error ? err.message : 'Não foi possível entrar com Google.';
@@ -232,24 +204,44 @@ async function loginWithGoogleAccount() {
 
 <style scoped>
 .login-content {
-  --background: #f3f4f6;
+  --background: #000;
 }
 
-.login-shell {
-  min-height: 100%;
+.password-row {
   display: flex;
-  flex-direction: column;
-  box-sizing: border-box;
+  gap: 0.5rem;
 }
 
-.login-main {
+.password-row .sb-form-control {
   flex: 1;
+}
+
+.password-toggle {
+  min-width: 4.5rem;
+  border: 1px solid #000;
+  background: #fff;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.login-panel__footer {
+  margin-top: 1.25rem;
+  text-align: center;
+}
+
+.link-button {
+  background: none;
+  border: 0;
+  color: #000;
+  font-weight: 600;
+  text-decoration: underline;
+  cursor: pointer;
+  padding: 0;
 }
 
 .login-footer {
   display: flex;
   justify-content: center;
-  padding: 1.5rem 0 0.5rem;
   margin-top: 1.5rem;
 }
 
@@ -260,12 +252,6 @@ async function loginWithGoogleAccount() {
   cursor: pointer;
 }
 
-.footer-logo-button:focus-visible {
-  outline: 2px solid #024964;
-  outline-offset: 4px;
-  border-radius: 8px;
-}
-
 .footer-logo {
   width: min(42vw, 7.5rem);
   height: auto;
@@ -273,75 +259,7 @@ async function loginWithGoogleAccount() {
   opacity: 0.9;
 }
 
-.brand {
-  text-align: center;
-  margin: 2rem 0;
-}
-
-.brand ion-icon {
-  font-size: 3rem;
-  color: #111827;
-}
-
-.brand-logo {
-  width: min(60vw, 12rem);
-  height: auto;
-  object-fit: contain;
-}
-
-.shop-avatar {
-  width: 5rem;
-  height: 5rem;
-  margin: 0 auto;
-}
-
-.avatar-fallback {
-  width: 100%;
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: #111827;
-  color: #fff;
-  font-weight: 700;
-}
-
-.brand h1 {
-  margin: 0.5rem 0 0;
-}
-
-.brand p {
-  color: #6b7280;
-}
-
-.error {
-  margin-top: 1rem;
-}
-
-.login-actions {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-}
-
-.login-actions ion-button {
-  margin: 0;
-  width: 100%;
-}
-
-.divider {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  margin: 1.5rem 0 1rem;
-  color: #9ca3af;
-}
-
-.divider::before,
-.divider::after {
-  content: '';
-  flex: 1;
-  height: 1px;
-  background: #d1d5db;
+.mb-3 {
+  margin-bottom: 0.75rem;
 }
 </style>
