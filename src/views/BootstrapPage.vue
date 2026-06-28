@@ -1,9 +1,9 @@
 <template>
   <ion-page>
-    <ion-content class="ion-padding ion-text-center">
+    <ion-content class="bootstrap-content" fullscreen>
       <div class="bootstrap">
-        <ion-spinner name="crescent" />
-        <p>Carregando...</p>
+        <img :src="logoImage" class="bootstrap-logo" alt="Smart Barbeiro" />
+        <ion-spinner class="bootstrap-spinner" name="circular" />
       </div>
     </ion-content>
   </ion-page>
@@ -13,6 +13,7 @@
 import { onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { IonContent, IonPage, IonSpinner } from '@ionic/vue';
+import logoImage from '@/assets/logo.png';
 import { getToken, isOnboardingComplete } from '@/services/storage';
 
 const router = useRouter();
@@ -36,12 +37,30 @@ onMounted(async () => {
 </script>
 
 <style scoped>
+.bootstrap-content {
+  --background: #000;
+}
+
 .bootstrap {
   min-height: 100%;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 1rem;
+  gap: 1.75rem;
+  padding: 2rem;
+  box-sizing: border-box;
+}
+
+.bootstrap-logo {
+  width: min(72vw, 16rem);
+  height: auto;
+  object-fit: contain;
+}
+
+.bootstrap-spinner {
+  width: 2rem;
+  height: 2rem;
+  --color: #9ca3af;
 }
 </style>

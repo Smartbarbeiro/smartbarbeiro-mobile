@@ -31,28 +31,27 @@
         <div class="url-input-row">
           <span class="url-prefix">{{ profileBaseUrl }}</span>
           <ion-input
+            v-model="searchText"
             class="url-suffix"
-            :value="manualUsername"
-            placeholder="nome-da-barbearia"
+            placeholder="nome ou usuário da barbearia"
             autocomplete="off"
             autocorrect="off"
             :spellcheck="false"
-            @ionInput="onUsernameInput"
-            @ionFocus="onUsernameFocus"
-            @ionBlur="onUsernameBlur"
+            @ionInput="onSearchInput"
           />
         </div>
-        <ul v-if="showSuggestions && suggestions.length" class="suggestions">
+        <ul v-if="suggestions.length" class="suggestions">
           <li
             v-for="item in suggestions"
             :key="item.username"
             class="suggestion-item"
             @mousedown.prevent="selectSuggestion(item)"
+            @click="selectSuggestion(item)"
           >
             <ion-avatar slot="start" class="suggestion-avatar">
               <img
-                v-if="item.profile_photo_url"
-                :src="item.profile_photo_url"
+                v-if="resolveApiAssetUrl(item.profile_photo_url)"
+                :src="resolveApiAssetUrl(item.profile_photo_url)!"
                 :alt="item.name"
               />
               <div v-else class="suggestion-avatar-fallback">{{ item.name.charAt(0) }}</div>
@@ -63,8 +62,9 @@
             </div>
           </li>
         </ul>
-        <p v-else-if="showSuggestions && searching" class="suggestions-hint">Buscando barbearias...</p>
-        <p v-else-if="showSuggestions && searchAttempted && !searching" class="suggestions-hint">
+        <p v-else-if="searching && searchQuery.length >= 3" class="suggestions-hint">Buscando barbearias...</p>
+        <p v-else-if="searchError" class="suggestions-hint suggestions-error">{{ searchError }}</p>
+        <p v-else-if="searchAttempted && searchQuery.length >= 3 && !searching" class="suggestions-hint">
           Nenhuma barbearia encontrada.
         </p>
       </div>
@@ -87,7 +87,7 @@ import {
   CapacitorBarcodeScannerCameraDirection,
   CapacitorBarcodeScannerTypeHint,
 } from '@capacitor/barcode-scanner';
-import { onBeforeUnmount, onMounted, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import {
   IonAvatar,
@@ -107,8 +107,10 @@ import type { BarbershopSearchResult } from '@/types/api';
 import {
   ApiError,
   fetchBarbershop,
+  getApiBaseUrl,
   getBarbershopProfileBaseUrl,
   parseBarbershopUsernameFromQr,
+  resolveApiAssetUrl,
   searchBarbershops,
 } from '@/services/api';
 import { ensureCameraPermission } from '@/services/cameraPermission';
@@ -116,32 +118,45 @@ import { setPreferredBarbershop } from '@/services/storage';
 
 const router = useRouter();
 const scannerHost = ref<HTMLElement | null>(null);
-const manualUsername = ref('');
+const searchText = ref('');
+const selectedUsername = ref('');
 const profileBaseUrl = ref(getBarbershopProfileBaseUrl());
 const suggestions = ref<BarbershopSearchResult[]>([]);
-const showSuggestions = ref(false);
 const searching = ref(false);
 const searchAttempted = ref(false);
+const searchError = ref('');
 const error = ref('');
 const scanning = ref(false);
 const isNative = Capacitor.isNativePlatform();
+const searchQuery = computed(() => searchText.value.trim());
 let scanner: Html5Qrcode | null = null;
 let handled = false;
 let searchTimer: ReturnType<typeof setTimeout> | null = null;
-let blurTimer: ReturnType<typeof setTimeout> | null = null;
 
-function sanitizeUsername(value: string): string {
-  return value.replace(/[^a-zA-Z0-9._-]/g, '');
-}
-
-function extractUsernameFromInput(raw: string): string {
+function normalizeSearchInput(raw: string): string {
   const trimmed = raw.trim();
   const fromUrl = parseBarbershopUsernameFromQr(trimmed);
-  if (fromUrl) {
-    return sanitizeUsername(fromUrl);
+
+  return fromUrl ?? trimmed;
+}
+
+function resolveUsernameForContinue(): string | null {
+  if (selectedUsername.value) {
+    return selectedUsername.value;
   }
 
-  return sanitizeUsername(trimmed);
+  const normalized = normalizeSearchInput(searchText.value);
+  const fromUrl = parseBarbershopUsernameFromQr(normalized);
+
+  if (fromUrl) {
+    return fromUrl;
+  }
+
+  if (/^[a-z0-9._-]+$/i.test(normalized)) {
+    return normalized;
+  }
+
+  return null;
 }
 
 function scheduleSearch() {
@@ -150,62 +165,59 @@ function scheduleSearch() {
   }
 
   searchTimer = setTimeout(async () => {
-    const query = manualUsername.value.trim();
+    const query = searchQuery.value;
 
     if (query.length < 3) {
       suggestions.value = [];
       searchAttempted.value = false;
+      searchError.value = '';
       searching.value = false;
       return;
     }
 
     searching.value = true;
     searchAttempted.value = false;
+    searchError.value = '';
 
     try {
       const response = await searchBarbershops(query);
       suggestions.value = response.results;
       searchAttempted.value = true;
-    } catch {
+    } catch (err) {
       suggestions.value = [];
       searchAttempted.value = true;
+      searchError.value =
+        err instanceof ApiError
+          ? err.message
+          : `Sem conexão com ${getApiBaseUrl()}. Confirme que o Laravel está rodando com php artisan serve --host=0.0.0.0 --port=8000 e que o celular está na mesma rede Wi‑Fi.`;
     } finally {
       searching.value = false;
     }
   }, 300);
 }
 
-function onUsernameInput(event: CustomEvent) {
+function onSearchInput(event: CustomEvent) {
   const raw = (event.detail.value ?? '') as string;
-  manualUsername.value = extractUsernameFromInput(raw);
+  const normalized = normalizeSearchInput(raw);
+
+  if (normalized !== searchText.value) {
+    searchText.value = normalized;
+  }
+
+  selectedUsername.value = '';
   error.value = '';
-  showSuggestions.value = true;
+}
+
+watch(searchText, () => {
   scheduleSearch();
-}
-
-function onUsernameFocus() {
-  if (blurTimer) {
-    clearTimeout(blurTimer);
-    blurTimer = null;
-  }
-
-  if (manualUsername.value.trim().length >= 3) {
-    showSuggestions.value = true;
-    scheduleSearch();
-  }
-}
-
-function onUsernameBlur() {
-  blurTimer = setTimeout(() => {
-    showSuggestions.value = false;
-  }, 150);
-}
+});
 
 function selectSuggestion(item: BarbershopSearchResult) {
-  manualUsername.value = item.username;
+  searchText.value = item.username;
+  selectedUsername.value = item.username;
   suggestions.value = [];
-  showSuggestions.value = false;
   searchAttempted.value = false;
+  searchError.value = '';
   error.value = '';
 }
 
@@ -228,14 +240,17 @@ async function openBarbershop(username: string) {
     await router.replace({ name: 'PlanBuilder', params: { username } });
   } catch (err) {
     handled = false;
-    error.value = err instanceof ApiError ? err.message : 'Barbearia não encontrada.';
+    error.value =
+      err instanceof ApiError
+        ? err.message
+        : `Sem conexão com ${getApiBaseUrl()}. Confirme que o Laravel está rodando e que o celular está na mesma rede Wi‑Fi.`;
   }
 }
 
 async function continueWithManual() {
-  const username = manualUsername.value.trim();
+  const username = resolveUsernameForContinue();
   if (!username) {
-    error.value = 'Informe o nome da barbearia após o link.';
+    error.value = 'Selecione uma barbearia na lista ou informe o usuário após o link.';
     return;
   }
 
@@ -335,22 +350,9 @@ async function startWebScanner() {
   }
 }
 
-onMounted(async () => {
-  if (isNative) {
-    await startNativeScan();
-    return;
-  }
-
-  await startWebScanner();
-});
-
 onBeforeUnmount(async () => {
   if (searchTimer) {
     clearTimeout(searchTimer);
-  }
-
-  if (blurTimer) {
-    clearTimeout(blurTimer);
   }
 
   await stopWebScanner();
@@ -373,6 +375,7 @@ onBeforeUnmount(async () => {
 
 .url-field {
   position: relative;
+  z-index: 1;
 }
 
 .url-label {
@@ -415,10 +418,6 @@ onBeforeUnmount(async () => {
 }
 
 .suggestions {
-  position: absolute;
-  z-index: 10;
-  left: 0;
-  right: 0;
   margin: 0.35rem 0 0;
   padding: 0;
   list-style: none;
@@ -482,6 +481,10 @@ onBeforeUnmount(async () => {
   margin: 0.35rem 0 0;
   font-size: 0.82rem;
   color: #6b7280;
+}
+
+.suggestions-error {
+  color: #dc2626;
 }
 
 .error {

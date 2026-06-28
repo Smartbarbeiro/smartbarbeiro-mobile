@@ -1,3 +1,4 @@
+import { Capacitor, CapacitorHttp } from '@capacitor/core';
 import type {
   ApiUser,
   BarbershopProfileResponse,
@@ -10,6 +11,10 @@ import { clearAuth, getToken } from './storage';
 
 const API_URL = (import.meta.env.VITE_API_URL as string | undefined)?.replace(/\/$/, '') ?? 'http://127.0.0.1:8000';
 
+export function getApiBaseUrl(): string {
+  return API_URL;
+}
+
 export class ApiError extends Error {
   status: number;
   errors: Record<string, string[]>;
@@ -21,11 +26,13 @@ export class ApiError extends Error {
   }
 }
 
-async function request<T>(
-  path: string,
-  options: RequestInit = {},
-  authenticated = false,
-): Promise<T> {
+type HttpPayload = Record<string, unknown>;
+
+function connectionErrorMessage(): string {
+  return `Sem conexão com ${API_URL}. Confirme que o Laravel está rodando com php artisan serve --host=0.0.0.0 --port=8000 e que o celular está na mesma rede Wi‑Fi.`;
+}
+
+function buildHeaders(options: RequestInit, authenticated: boolean): Record<string, string> {
   const headers: Record<string, string> = {
     Accept: 'application/json',
     'ngrok-skip-browser-warning': 'true',
@@ -36,32 +43,106 @@ async function request<T>(
     headers['Content-Type'] = 'application/json';
   }
 
-  if (authenticated) {
-    const token = await getToken();
-    if (token) {
-      headers.Authorization = `Bearer ${token}`;
+  return headers;
+}
+
+async function attachAuthHeader(headers: Record<string, string>, authenticated: boolean): Promise<void> {
+  if (!authenticated) {
+    return;
+  }
+
+  const token = await getToken();
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+}
+
+async function performHttpRequest(
+  url: string,
+  options: RequestInit,
+  headers: Record<string, string>,
+): Promise<{ ok: boolean; status: number; payload: HttpPayload }> {
+  if (Capacitor.isNativePlatform()) {
+    const method = (options.method ?? 'GET').toUpperCase();
+    let data: unknown;
+
+    if (options.body && typeof options.body === 'string') {
+      try {
+        data = JSON.parse(options.body);
+      } catch {
+        data = options.body;
+      }
+    }
+
+    try {
+      const response = await CapacitorHttp.request({
+        url,
+        method,
+        headers,
+        data,
+      });
+
+      const payload =
+        typeof response.data === 'object' && response.data !== null
+          ? (response.data as HttpPayload)
+          : {};
+
+      return {
+        ok: response.status >= 200 && response.status < 300,
+        status: response.status,
+        payload,
+      };
+    } catch {
+      throw new ApiError(connectionErrorMessage(), 0);
     }
   }
 
-  const response = await fetch(`${API_URL}${path}`, {
-    ...options,
-    headers,
-  });
+  let response: Response;
 
-  const payload = await response.json().catch(() => ({}));
+  try {
+    response = await fetch(url, {
+      ...options,
+      headers,
+    });
+  } catch {
+    throw new ApiError(connectionErrorMessage(), 0);
+  }
 
-  if (!response.ok) {
-    if (response.status === 401 && authenticated) {
+  const payload = (await response.json().catch(() => ({}))) as HttpPayload;
+
+  return {
+    ok: response.ok,
+    status: response.status,
+    payload,
+  };
+}
+
+function throwApiError(status: number, payload: HttpPayload): never {
+  const errors = (payload.errors ?? {}) as Record<string, string[]>;
+  const message =
+    (payload.message as string | undefined) ??
+    Object.values(errors).flat()[0] ??
+    'Não foi possível concluir a solicitação.';
+
+  throw new ApiError(message, status, errors);
+}
+
+async function request<T>(
+  path: string,
+  options: RequestInit = {},
+  authenticated = false,
+): Promise<T> {
+  const headers = buildHeaders(options, authenticated);
+  await attachAuthHeader(headers, authenticated);
+
+  const { ok, status, payload } = await performHttpRequest(`${API_URL}${path}`, options, headers);
+
+  if (!ok) {
+    if (status === 401 && authenticated) {
       await clearAuth();
     }
 
-    const errors = (payload.errors ?? {}) as Record<string, string[]>;
-    const message =
-      (payload.message as string | undefined) ??
-      Object.values(errors).flat()[0] ??
-      'Não foi possível concluir a solicitação.';
-
-    throw new ApiError(message, response.status, errors);
+    throwApiError(status, payload);
   }
 
   return payload as T;
@@ -82,34 +163,29 @@ export async function loginWithGoogle(tokens: {
   accessToken?: string;
   idToken?: string;
 }): Promise<{ token: string; user: ApiUser } | GoogleRegistrationRequiredResponse> {
-  const response = await fetch(`${API_URL}/api/v1/auth/google`, {
+  const options: RequestInit = {
     method: 'POST',
-    headers: {
-      Accept: 'application/json',
-      'Content-Type': 'application/json',
-      'ngrok-skip-browser-warning': 'true',
-    },
     body: JSON.stringify({
       access_token: tokens.accessToken,
       id_token: tokens.idToken,
       device_name: 'smartbarbeiro-mobile',
     }),
-  });
+  };
+  const headers = buildHeaders(options, false);
+  const { ok, status, payload } = await performHttpRequest(`${API_URL}/api/v1/auth/google`, options, headers);
 
-  const payload = await response.json().catch(() => ({}));
-
-  if (response.status === 422 && payload.status === 'registration_required') {
-    return payload as GoogleRegistrationRequiredResponse;
+  if (status === 422 && payload.status === 'registration_required') {
+    return payload as unknown as GoogleRegistrationRequiredResponse;
   }
 
-  if (!response.ok) {
+  if (!ok) {
     const errors = (payload.errors ?? {}) as Record<string, string[]>;
     const message =
       (payload.message as string | undefined) ??
       Object.values(errors).flat()[0] ??
       'Não foi possível entrar com Google.';
 
-    throw new ApiError(message, response.status, errors);
+    throw new ApiError(message, status, errors);
   }
 
   return payload as { token: string; user: ApiUser };
@@ -159,6 +235,18 @@ export async function fetchBarbershop(username: string): Promise<BarbershopProfi
 
 export function getBarbershopProfileBaseUrl(): string {
   return `${API_URL.replace(/\/$/, '')}/barbearias/`;
+}
+
+export function resolveApiAssetUrl(path: string | null | undefined): string | null {
+  if (!path) {
+    return null;
+  }
+
+  if (/^https?:\/\//i.test(path)) {
+    return path;
+  }
+
+  return `${API_URL}${path.startsWith('/') ? path : `/${path}`}`;
 }
 
 export async function searchBarbershops(query: string): Promise<BarbershopSearchResponse> {

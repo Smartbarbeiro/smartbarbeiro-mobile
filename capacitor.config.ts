@@ -6,12 +6,16 @@ const config: CapacitorConfig = {
   appId: 'com.smartbarbeiro.client',
   appName: 'Smart Barbeiro',
   webDir: 'dist',
-  server: devServerUrl
-    ? {
-        url: devServerUrl,
-        cleartext: true,
-      }
-    : undefined,
+  server: {
+    androidScheme: 'http',
+    cleartext: true,
+    ...(devServerUrl ? { url: devServerUrl } : {}),
+  },
+  plugins: {
+    CapacitorHttp: {
+      enabled: true,
+    },
+  },
 };
 
 export default config;

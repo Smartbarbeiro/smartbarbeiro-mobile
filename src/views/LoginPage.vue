@@ -6,72 +6,82 @@
       </ion-toolbar>
     </ion-header>
 
-    <ion-content class="ion-padding login-content">
-      <div class="brand">
-        <template v-if="preferredBarbershop">
-          <ion-avatar class="shop-avatar">
-            <img
-              v-if="preferredBarbershop.profile_photo_url"
-              :src="preferredBarbershop.profile_photo_url"
-              alt=""
-            />
-            <div v-else class="avatar-fallback">{{ barbershopInitials }}</div>
-          </ion-avatar>
-          <h1>{{ preferredBarbershop.name }}</h1>
-          <p>Acesse sua conta de cliente</p>
-        </template>
-        <template v-else>
-          <ion-icon :icon="cutOutline" />
-          <h1>Smart Barbeiro</h1>
-          <p>Acesse sua conta de cliente</p>
-        </template>
+    <ion-content class="login-content">
+      <div class="login-shell ion-padding">
+        <div class="login-main">
+          <div class="brand">
+            <template v-if="preferredBarbershop">
+              <ion-avatar class="shop-avatar">
+                <img
+                  v-if="preferredBarbershop.profile_photo_url"
+                  :src="preferredBarbershop.profile_photo_url"
+                  alt=""
+                />
+                <div v-else class="avatar-fallback">{{ barbershopInitials }}</div>
+              </ion-avatar>
+              <h1>{{ preferredBarbershop.name }}</h1>
+              <p>Acesse sua conta de cliente</p>
+            </template>
+            <template v-else>
+              <img :src="logoImage" class="brand-logo" alt="Smart Barbeiro" />
+              <h1>Smart Barbeiro</h1>
+              <p>Acesse sua conta de cliente</p>
+            </template>
+          </div>
+
+          <form @submit.prevent="submit">
+            <ion-item lines="full">
+              <ion-label position="stacked">E-mail</ion-label>
+              <ion-input v-model="email" type="email" autocomplete="email" required />
+            </ion-item>
+
+            <ion-item lines="full">
+              <ion-label position="stacked">Senha</ion-label>
+              <ion-input v-model="password" type="password" autocomplete="current-password" required />
+            </ion-item>
+
+            <ion-text v-if="error" color="danger">
+              <p class="error">{{ error }}</p>
+            </ion-text>
+
+            <div class="login-actions ion-margin-top">
+              <ion-button expand="block" type="submit" :disabled="loading">
+                {{ loading ? 'Entrando...' : 'Entrar' }}
+              </ion-button>
+
+              <ion-button
+                v-if="googleEnabled"
+                expand="block"
+                type="button"
+                fill="outline"
+                color="medium"
+                :disabled="googleLoading"
+                @click="loginWithGoogleAccount"
+              >
+                <ion-icon slot="start" :icon="logoGoogle" aria-hidden="true" />
+                {{ googleLoading ? 'Conectando...' : 'Continuar com Google' }}
+              </ion-button>
+            </div>
+          </form>
+
+          <template v-if="googleEnabled">
+            <div class="divider">
+              <span>ou</span>
+            </div>
+          </template>
+
+          <ion-button expand="block" fill="outline" class="ion-margin-top" @click="goToQrScan">
+            <ion-icon slot="start" :icon="qrCodeOutline" aria-hidden="true" />
+            Escanear QR da barbearia
+          </ion-button>
+        </div>
+
+        <footer class="login-footer">
+          <button type="button" class="footer-logo-button" @click="showSupportOptions">
+            <img :src="logoImage" class="footer-logo" alt="Smart Barbeiro" />
+          </button>
+        </footer>
       </div>
-
-      <form @submit.prevent="submit">
-        <ion-item lines="full">
-          <ion-label position="stacked">E-mail</ion-label>
-          <ion-input v-model="email" type="email" autocomplete="email" required />
-        </ion-item>
-
-        <ion-item lines="full">
-          <ion-label position="stacked">Senha</ion-label>
-          <ion-input v-model="password" type="password" autocomplete="current-password" required />
-        </ion-item>
-
-        <ion-text v-if="error" color="danger">
-          <p class="error">{{ error }}</p>
-        </ion-text>
-
-        <div class="login-actions ion-margin-top">
-          <ion-button expand="block" type="submit" :disabled="loading">
-            {{ loading ? 'Entrando...' : 'Entrar' }}
-          </ion-button>
-
-          <ion-button
-            v-if="googleEnabled"
-            expand="block"
-            type="button"
-            fill="outline"
-            color="medium"
-            :disabled="googleLoading"
-            @click="loginWithGoogleAccount"
-          >
-            <ion-icon slot="start" :icon="logoGoogle" aria-hidden="true" />
-            {{ googleLoading ? 'Conectando...' : 'Continuar com Google' }}
-          </ion-button>
-        </div>
-      </form>
-
-      <template v-if="googleEnabled">
-        <div class="divider">
-          <span>ou</span>
-        </div>
-      </template>
-
-      <ion-button expand="block" fill="outline" class="ion-margin-top" @click="goToQrScan">
-        <ion-icon slot="start" :icon="qrCodeOutline" aria-hidden="true" />
-        Escanear QR da barbearia
-      </ion-button>
     </ion-content>
   </ion-page>
 </template>
@@ -92,9 +102,13 @@ import {
   IonText,
   IonTitle,
   IonToolbar,
+  actionSheetController,
   toastController,
 } from '@ionic/vue';
-import { cutOutline, logoGoogle, qrCodeOutline } from 'ionicons/icons';
+import { Browser } from '@capacitor/browser';
+import { logoGoogle, qrCodeOutline } from 'ionicons/icons';
+import logoImage from '@/assets/logo.png';
+import { SUPPORT_WEBSITE_URL, supportPhoneDialUrl } from '@/config/support';
 import { ApiError, login, loginWithGoogle } from '@/services/api';
 import { initializeGoogleAuth, isGoogleAuthAvailable, signInWithGoogle } from '@/services/googleAuth';
 import { setAuth, getPreferredBarbershop, type PreferredBarbershop } from '@/services/storage';
@@ -142,6 +156,51 @@ async function goToQrScan() {
   await router.push({ name: 'QrScan' });
 }
 
+async function openSupportWebsite() {
+  await Browser.open({ url: SUPPORT_WEBSITE_URL });
+}
+
+async function callSupport() {
+  const dialUrl = supportPhoneDialUrl();
+
+  if (!dialUrl) {
+    const toast = await toastController.create({
+      message: 'Telefone de suporte não configurado.',
+      duration: 3000,
+    });
+    await toast.present();
+    return;
+  }
+
+  window.location.href = dialUrl;
+}
+
+async function showSupportOptions() {
+  const sheet = await actionSheetController.create({
+    header: 'Precisa de ajuda?',
+    buttons: [
+      {
+        text: 'Ir para o website',
+        handler: () => {
+          void openSupportWebsite();
+        },
+      },
+      {
+        text: 'Ligar para suporte',
+        handler: () => {
+          void callSupport();
+        },
+      },
+      {
+        text: 'Cancelar',
+        role: 'cancel',
+      },
+    ],
+  });
+
+  await sheet.present();
+}
+
 async function loginWithGoogleAccount() {
   googleLoading.value = true;
   error.value = '';
@@ -176,6 +235,44 @@ async function loginWithGoogleAccount() {
   --background: #f3f4f6;
 }
 
+.login-shell {
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+}
+
+.login-main {
+  flex: 1;
+}
+
+.login-footer {
+  display: flex;
+  justify-content: center;
+  padding: 1.5rem 0 0.5rem;
+  margin-top: 1.5rem;
+}
+
+.footer-logo-button {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.footer-logo-button:focus-visible {
+  outline: 2px solid #024964;
+  outline-offset: 4px;
+  border-radius: 8px;
+}
+
+.footer-logo {
+  width: min(42vw, 7.5rem);
+  height: auto;
+  object-fit: contain;
+  opacity: 0.9;
+}
+
 .brand {
   text-align: center;
   margin: 2rem 0;
@@ -184,6 +281,12 @@ async function loginWithGoogleAccount() {
 .brand ion-icon {
   font-size: 3rem;
   color: #111827;
+}
+
+.brand-logo {
+  width: min(60vw, 12rem);
+  height: auto;
+  object-fit: contain;
 }
 
 .shop-avatar {
