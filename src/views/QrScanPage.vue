@@ -164,7 +164,6 @@ function scheduleSearch() {
 
     try {
       const response = await searchBarbershops(query);
-      profileBaseUrl.value = response.profile_base_url;
       suggestions.value = response.results;
       searchAttempted.value = true;
     } catch {
