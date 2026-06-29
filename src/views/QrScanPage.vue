@@ -1,15 +1,8 @@
 <template>
   <ion-page>
-    <ion-header>
-      <ion-toolbar>
-        <ion-buttons slot="start">
-          <ion-back-button default-href="/login" />
-        </ion-buttons>
-        <ion-title>Escanear QR</ion-title>
-      </ion-toolbar>
-    </ion-header>
+    <AppHeader title="Escanear QR" show-back back-href="/login" />
 
-    <ion-content class="ion-padding">
+    <ion-content class="page-content ion-padding">
       <p class="hint">
         Aponte a câmera para o QR Code da barbearia. Você também pode colar o link ou digitar o nome da barbearia.
       </p>
@@ -91,19 +84,15 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import {
   IonAvatar,
-  IonBackButton,
   IonButton,
-  IonButtons,
   IonContent,
-  IonHeader,
   IonInput,
   IonPage,
   IonText,
-  IonTitle,
-  IonToolbar,
 } from '@ionic/vue';
 import { Html5Qrcode } from 'html5-qrcode';
 import type { BarbershopSearchResult } from '@/types/api';
+import AppHeader from '@/components/AppHeader.vue';
 import {
   ApiError,
   fetchBarbershop,
@@ -234,7 +223,7 @@ async function openBarbershop(username: string) {
     await setPreferredBarbershop({
       username: barbershop.profile.username,
       name: barbershop.profile.name,
-      profile_photo_url: barbershop.profile.profile_photo_url,
+      profile_photo_url: resolveApiAssetUrl(barbershop.profile.profile_photo_url),
     });
     await stopWebScanner();
     await router.replace({ name: 'PlanBuilder', params: { username } });
@@ -489,5 +478,9 @@ onBeforeUnmount(async () => {
 
 .error {
   margin-top: 1rem;
+}
+
+.page-content {
+  --background: #f3f4f6;
 }
 </style>

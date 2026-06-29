@@ -18,10 +18,11 @@ export interface ServicePackage {
 
 export interface ServiceAddon {
   id: number;
-  label: string;
+  name: string;
   monthly_price: number;
   formatted_price: string;
   is_enabled: boolean;
+  sort_order?: number;
 }
 
 export interface BarbershopProfileResponse {

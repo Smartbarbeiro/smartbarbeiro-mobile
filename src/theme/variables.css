@@ -2,6 +2,7 @@
 http://ionicframework.com/docs/theming/ */
 
 :root {
+  --app-header-height: 36px;
   --app-toolbar-gradient: linear-gradient(
     45deg,
     #fff 0%,
@@ -24,9 +25,15 @@ ion-header ion-toolbar {
   --color: #ffffff;
   --border-width: 0;
   --border-style: none;
-  --min-height: 40px;
+  --min-height: var(--app-header-height);
   --padding-top: 0;
   --padding-bottom: 0;
+  --padding-start: 4px;
+  --padding-end: 4px;
+}
+
+ion-header ion-toolbar::part(container) {
+  min-height: var(--app-header-height);
 }
 
 ion-header ion-toolbar ion-title,
@@ -38,18 +45,28 @@ ion-header ion-toolbar ion-button {
 }
 
 ion-header ion-toolbar ion-title {
-  font-size: 1rem;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  --padding-top: 0;
+  --padding-bottom: 0;
+}
+
+ion-header ion-toolbar ion-back-button {
+  --icon-font-size: 1.125rem;
+  --min-height: var(--app-header-height);
+  --padding-start: 0;
+  --padding-end: 0;
 }
 
 ion-header ion-toolbar ion-button {
-  font-size: 0.95rem;
+  font-size: 0.8125rem;
   font-weight: 600;
   --border-radius: 9999px;
-  --padding-top: 8px;
-  --padding-bottom: 8px;
-  --padding-start: 16px;
-  --padding-end: 16px;
-  min-height: 36px;
+  --padding-top: 4px;
+  --padding-bottom: 4px;
+  --padding-start: 12px;
+  --padding-end: 12px;
+  min-height: 28px;
   --background: rgba(255, 255, 255, 0.18);
   --background-hover: rgba(255, 255, 255, 0.28);
   --background-activated: rgba(255, 255, 255, 0.24);

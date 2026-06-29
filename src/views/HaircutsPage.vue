@@ -1,16 +1,25 @@
 <template>
   <ion-page>
-    <ion-content class="sb-page-light sb-content-with-tabs">
-      <div class="sb-stub-page">
-        <h1>Cortes</h1>
-        <p>Galeria de fotos dos seus cortes — mesma experiência do site, em breve no app.</p>
-      </div>
-      <ClientTabBar />
+    <AppHeader title="Cortes" />
+
+    <ion-content class="page-content ion-padding" :class="{ 'sb-content-with-tabs': showTabBar }">
+      <p>Galeria de fotos dos seus cortes — mesma experiência do site, em breve no app.</p>
+      <ClientTabBar v-if="showTabBar" />
     </ion-content>
   </ion-page>
 </template>
 
 <script setup lang="ts">
 import { IonContent, IonPage } from '@ionic/vue';
+import AppHeader from '@/components/AppHeader.vue';
 import ClientTabBar from '@/components/ClientTabBar.vue';
+import { useClientTabBar } from '@/composables/useClientTabBar';
+
+const { showTabBar } = useClientTabBar();
 </script>
+
+<style scoped>
+.page-content {
+  --background: #f3f4f6;
+}
+</style>

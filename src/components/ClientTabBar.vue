@@ -3,21 +3,23 @@ import { computed, onMounted, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { cardOutline, cutOutline, homeOutline, settingsOutline } from 'ionicons/icons';
 import { IonIcon } from '@ionic/vue';
-import { getStoredUser } from '@/services/storage';
+import { getToken, getStoredUser } from '@/services/storage';
 import type { ApiUser } from '@/types/api';
 
 const route = useRoute();
 const router = useRouter();
 const user = ref<ApiUser | null>(null);
+const isAuthenticated = ref(false);
 
 onMounted(async () => {
+  isAuthenticated.value = !!(await getToken());
   user.value = await getStoredUser<ApiUser>();
 });
 
 const username = computed(() => user.value?.primary_barbershop_username ?? null);
 
 const items = computed(() => {
-  if (!username.value) {
+  if (!isAuthenticated.value || !username.value) {
     return [];
   }
 

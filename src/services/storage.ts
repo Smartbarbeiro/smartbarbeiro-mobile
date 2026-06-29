@@ -5,6 +5,7 @@ const KEYS = {
   user: 'auth_user',
   onboardingComplete: 'onboarding_complete',
   preferredBarbershop: 'preferred_barbershop',
+  lastLoginEmail: 'last_login_email',
 } as const;
 
 export interface PreferredBarbershop {
@@ -18,9 +19,28 @@ export async function getToken(): Promise<string | null> {
   return value;
 }
 
+export async function getLastLoginEmail(): Promise<string | null> {
+  const { value } = await Preferences.get({ key: KEYS.lastLoginEmail });
+  return value;
+}
+
+export async function setLastLoginEmail(email: string): Promise<void> {
+  const normalized = email.trim().toLowerCase();
+  if (!normalized) {
+    return;
+  }
+
+  await Preferences.set({ key: KEYS.lastLoginEmail, value: normalized });
+}
+
 export async function setAuth(token: string, user: unknown): Promise<void> {
   await Preferences.set({ key: KEYS.token, value: token });
   await Preferences.set({ key: KEYS.user, value: JSON.stringify(user) });
+
+  const email = (user as { email?: string | null })?.email;
+  if (email) {
+    await setLastLoginEmail(email);
+  }
 }
 
 export async function clearAuth(): Promise<void> {

@@ -1,17 +1,16 @@
 <template>
   <ion-page>
-    <ion-content class="sb-page-light sb-content-with-tabs">
-      <div class="sb-stub-page">
-        <h1>Meu plano</h1>
-        <p v-if="user?.primary_barbershop_username">
-          Em breve você verá aqui o status da assinatura em @{{ user.primary_barbershop_username }}.
-        </p>
-        <p v-else>Vincule-se a uma barbearia para acompanhar seu plano.</p>
-        <button v-if="username" type="button" class="sb-btn-dark mt-4" @click="goToPlan">
-          Ir para a barbearia
-        </button>
-      </div>
-      <ClientTabBar />
+    <AppHeader title="Plano" />
+
+    <ion-content class="page-content ion-padding" :class="{ 'sb-content-with-tabs': showTabBar }">
+      <p v-if="user?.primary_barbershop_username">
+        Em breve você verá aqui o status da assinatura em @{{ user.primary_barbershop_username }}.
+      </p>
+      <p v-else>Vincule-se a uma barbearia para acompanhar seu plano.</p>
+      <ion-button v-if="username" expand="block" class="ion-margin-top" @click="goToPlan">
+        Ir para a barbearia
+      </ion-button>
+      <ClientTabBar v-if="showTabBar" />
     </ion-content>
   </ion-page>
 </template>
@@ -19,13 +18,16 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
-import { IonContent, IonPage } from '@ionic/vue';
+import { IonButton, IonContent, IonPage } from '@ionic/vue';
+import AppHeader from '@/components/AppHeader.vue';
 import ClientTabBar from '@/components/ClientTabBar.vue';
+import { useClientTabBar } from '@/composables/useClientTabBar';
 import { fetchMe } from '@/services/api';
-import { getStoredUser } from '@/services/storage';
+import { getStoredUser, getToken, setAuth } from '@/services/storage';
 import type { ApiUser } from '@/types/api';
 
 const router = useRouter();
+const { showTabBar } = useClientTabBar();
 const user = ref<ApiUser | null>(null);
 
 const username = computed(() => user.value?.primary_barbershop_username ?? null);
@@ -36,8 +38,13 @@ onMounted(async () => {
   try {
     const response = await fetchMe();
     user.value = response.user;
+
+    const token = await getToken();
+    if (token) {
+      await setAuth(token, response.user);
+    }
   } catch {
-    // Router guard handles auth redirect.
+    // Keep cached session on network errors; router guard handles missing auth.
   }
 });
 
@@ -51,10 +58,7 @@ async function goToPlan() {
 </script>
 
 <style scoped>
-.mt-4 {
-  margin-top: 1rem;
-  max-width: 20rem;
-  margin-inline: auto;
-  display: block;
+.page-content {
+  --background: #f3f4f6;
 }
 </style>

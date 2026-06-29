@@ -14,13 +14,14 @@ import { onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { IonContent, IonPage, IonSpinner } from '@ionic/vue';
 import logoImage from '@/assets/logo.png';
-import { getToken, isOnboardingComplete } from '@/services/storage';
+import { getToken, getPreferredBarbershop, isOnboardingComplete } from '@/services/storage';
 
 const router = useRouter();
 
 onMounted(async () => {
   const token = await getToken();
   const onboardingDone = await isOnboardingComplete();
+  const preferredBarbershop = await getPreferredBarbershop();
 
   if (token) {
     await router.replace({ name: 'Home' });
@@ -32,7 +33,12 @@ onMounted(async () => {
     return;
   }
 
-  await router.replace({ name: 'Login' });
+  if (preferredBarbershop) {
+    await router.replace({ name: 'Login' });
+    return;
+  }
+
+  await router.replace({ name: 'QrScan' });
 });
 </script>
 

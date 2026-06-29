@@ -1,12 +1,12 @@
 <template>
   <ion-page>
-    <ion-content class="sb-page-light" :class="{ 'sb-content-with-tabs': showTabBar }">
+    <AppHeader title="Montar plano" :show-back="!showTabBar" back-href="/qr-scan" />
+
+    <ion-content class="sb-page-light ion-padding" :class="{ 'sb-content-with-tabs': showTabBar }">
       <ion-spinner v-if="loading" name="crescent" class="center-spinner" />
 
       <div v-else-if="profile" class="barbershop-profile-page">
-        <div class="barbershop-profile-header" aria-hidden="true" />
-
-        <div class="barbershop-profile-main">
+        <div v-if="!checkoutStep" class="barbershop-profile-main">
           <ProfileAvatar
             :name="profile.profile.name"
             :photo-url="profilePhotoUrl"
@@ -72,7 +72,7 @@
                     @change="toggleAddon(addon.id, ($event.target as HTMLInputElement).checked)"
                   />
                   <span>
-                    {{ addon.label }}
+                    {{ addon.name }}
                     <span class="text-muted">({{ addon.formatted_price }}/mês)</span>
                   </span>
                 </label>
@@ -88,10 +88,12 @@
               </p>
             </template>
 
-            <div v-if="checkoutStep === 'summary' && selectedPackage" class="plan-checkout">
-              <button type="button" class="og-btn og-btn--neutral back-button" @click="editPlan">
-                <span class="og-btn__label">← Voltar</span>
-              </button>
+            <div v-if="checkoutStep === 'summary' && selectedPackage" class="plan-checkout plan-checkout-step">
+              <div class="plan-checkout-header">
+                <button type="button" class="og-btn og-btn--neutral back-button" @click="editPlan">
+                  <span class="og-btn__label">← Voltar</span>
+                </button>
+              </div>
 
               <div class="perfil-barbearia mt-4">
                 <ProfileAvatar
@@ -110,7 +112,7 @@
                 <ul>
                   <li>{{ selectedPackage.label }} — ilimitados</li>
                   <li v-for="addon in selectedAddons" :key="addon.id" class="text-muted">
-                    {{ addon.label }} — {{ addon.formatted_price }}/mês
+                    {{ addon.name }} — {{ addon.formatted_price }}/mês
                   </li>
                   <li v-if="selectedAddons.length === 0" class="text-muted">Nenhum opcional selecionado</li>
                 </ul>
@@ -125,10 +127,12 @@
               </button>
             </div>
 
-            <div v-if="checkoutStep === 'payment' && selectedPackage" class="plan-checkout plan-payment">
-              <button type="button" class="og-btn og-btn--neutral back-button" @click="backToSummary">
-                <span class="og-btn__label">← Voltar</span>
-              </button>
+            <div v-if="checkoutStep === 'payment' && selectedPackage" class="plan-checkout plan-payment plan-checkout-step">
+              <div class="plan-checkout-header">
+                <button type="button" class="og-btn og-btn--neutral back-button" @click="backToSummary">
+                  <span class="og-btn__label">← Voltar</span>
+                </button>
+              </div>
 
               <div class="carrinho-total mb-4">
                 <p class="h6 fw-bold mb-1">Total do plano</p>
@@ -235,12 +239,14 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue';
 import { useRouter } from 'vue-router';
-import { IonContent, IonPage, IonSpinner, toastController } from '@ionic/vue';
+import { IonContent, IonPage, IonSpinner, onIonViewWillEnter, toastController } from '@ionic/vue';
 import cardImageUrl from '@/assets/images/cartao.svg';
+import AppHeader from '@/components/AppHeader.vue';
 import ClientTabBar from '@/components/ClientTabBar.vue';
 import ProfileAvatar from '@/components/ProfileAvatar.vue';
 import ServicePlanIcon from '@/components/ServicePlanIcon.vue';
 import WalletCheckoutSheet from '@/components/WalletCheckoutSheet.vue';
+import { useClientTabBar } from '@/composables/useClientTabBar';
 import {
   ApiError,
   fetchBarbershop,
@@ -257,6 +263,7 @@ import type { BarbershopProfileResponse } from '@/types/api';
 
 const props = defineProps<{ username: string }>();
 const router = useRouter();
+const { showTabBar, refreshTabBarVisibility } = useClientTabBar();
 
 const loading = ref(true);
 const submitting = ref(false);
@@ -265,7 +272,6 @@ const googleEnabled = ref(false);
 const useGoogleSignup = ref(false);
 const googleTokens = ref<GoogleTokens | null>(null);
 const isAuthenticated = ref(false);
-const showTabBar = ref(false);
 const error = ref('');
 const profile = ref<BarbershopProfileResponse | null>(null);
 const selectedPackageType = ref<string | null>(null);
@@ -370,7 +376,7 @@ async function startGoogleSignup() {
     const authResponse = response as { token: string; user: import('@/types/api').ApiUser };
     await setAuth(authResponse.token, authResponse.user);
     isAuthenticated.value = true;
-    showTabBar.value = true;
+    await refreshTabBarVisibility();
     const toast = await toastController.create({
       message: 'Conta encontrada. Continue o pagamento.',
       duration: 2500,
@@ -402,7 +408,7 @@ async function ensureRegistered(): Promise<boolean> {
     });
     await setAuth(auth.token, auth.user);
     isAuthenticated.value = true;
-    showTabBar.value = true;
+    await refreshTabBarVisibility();
     return true;
   }
 
@@ -412,7 +418,7 @@ async function ensureRegistered(): Promise<boolean> {
   });
   await setAuth(auth.token, auth.user);
   isAuthenticated.value = true;
-  showTabBar.value = true;
+  await refreshTabBarVisibility();
   return true;
 }
 
@@ -456,9 +462,16 @@ async function onPaymentCompleted(message: string) {
   await router.replace({ name: 'Home' });
 }
 
+onIonViewWillEnter(() => {
+  void (async () => {
+    isAuthenticated.value = !!(await getToken());
+    await refreshTabBarVisibility();
+  })();
+});
+
 onMounted(async () => {
   isAuthenticated.value = !!(await getToken());
-  showTabBar.value = isAuthenticated.value;
+  await refreshTabBarVisibility();
   googleEnabled.value = await isGoogleAuthAvailable();
   await initializeGoogleAuth();
 
@@ -497,10 +510,6 @@ onMounted(async () => {
 
 .text-muted {
   color: #6b7280;
-}
-
-.back-button {
-  margin-top: 0.5rem;
 }
 
 .fw-semibold {
