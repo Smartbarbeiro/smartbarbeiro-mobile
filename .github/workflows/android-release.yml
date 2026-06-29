@@ -1,0 +1,88 @@
+# Manual release: builds a signed AAB for Google Play.
+# Trigger: Actions → Android Release → Run workflow
+#
+# Required repository secrets (Settings → Secrets and variables → Actions):
+#   ANDROID_KEYSTORE_BASE64   — base64 of your .jks file
+#   ANDROID_KEYSTORE_PASSWORD
+#   ANDROID_KEY_ALIAS
+#   ANDROID_KEY_PASSWORD
+#
+# Create keystore locally (once):
+#   keytool -genkey -v -keystore smartbarbeiro-upload.jks -keyalg RSA -keysize 2048 -validity 10000 -alias upload
+#
+# Encode for GitHub secret:
+#   Linux/macOS: base64 -w 0 smartbarbeiro-upload.jks
+#   PowerShell:  [Convert]::ToBase64String([IO.File]::ReadAllBytes("smartbarbeiro-upload.jks"))
+name: Android Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version_name:
+        description: User-visible version (e.g. 1.0.1)
+        required: true
+        default: '1.0.1'
+      version_code:
+        description: Integer versionCode for Play Store (must increase each upload)
+        required: true
+        default: '2'
+
+env:
+  VITE_API_URL: https://www.smartbarbeiro.com.br
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - run: npm ci
+      - run: npm run build
+      - run: npx cap sync android
+
+      - name: Patch Android version
+        run: |
+          sed -i "s/versionCode [0-9]*/versionCode ${{ inputs.version_code }}/" android/app/build.gradle
+          sed -i 's/versionName "[^"]*"/versionName "${{ inputs.version_name }}"/' android/app/build.gradle
+
+      - name: Decode upload keystore
+        run: echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > android/app/release.keystore
+
+      - name: Grant execute permission for Gradle wrapper
+        run: chmod +x android/gradlew
+
+      - name: Build release AAB
+        working-directory: android
+        env:
+          ANDROID_KEYSTORE_PATH: app/release.keystore
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: ./gradlew bundleRelease --no-daemon
+
+      - name: Upload AAB artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-release-aab
+          path: android/app/build/outputs/bundle/release/app-release.aab
+          retention-days: 30
+
+      # Optional: upload directly to Play Console (internal track)
+      # Requires a Google Play service account JSON secret: PLAY_SERVICE_ACCOUNT_JSON
+      # - uses: r0adkll/upload-google-play@v1
+      #   with:
+      #     serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+      #     packageName: com.smartbarbeiro.client
+      #     releaseFiles: android/app/build/outputs/bundle/release/app-release.aab
+      #     track: internal
+      #     status: completed
