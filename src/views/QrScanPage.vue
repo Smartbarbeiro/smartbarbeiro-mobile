@@ -4,7 +4,7 @@
 
     <ion-content class="page-content ion-padding">
       <p class="hint">
-        Aponte a câmera para o QR Code da barbearia. Você também pode colar o link ou digitar o nome da barbearia.
+        Aponte a câmera para o QR Code da barbearia ou busque pelo nome da barbearia abaixo. Você também pode colar o link do perfil.
       </p>
 
       <ion-button
@@ -20,13 +20,13 @@
       <div v-else ref="scannerHost" class="scanner-host" />
 
       <div class="url-field ion-margin-top">
-        <label class="url-label">Link da barbearia</label>
-        <div class="url-input-row">
-          <span class="url-prefix">{{ profileBaseUrl }}</span>
+        <label class="url-label">Buscar barbearia</label>
+        <div class="profile-url-block">
+          <p class="profile-url-prefix">{{ profileBaseUrl }}</p>
           <ion-input
             v-model="searchText"
-            class="url-suffix"
-            placeholder="nome ou usuário da barbearia"
+            class="search-input"
+            placeholder="Nome ou usuário da barbearia"
             autocomplete="off"
             autocorrect="off"
             :spellcheck="false"
@@ -45,13 +45,15 @@
               <img
                 v-if="resolveApiAssetUrl(item.profile_photo_url)"
                 :src="resolveApiAssetUrl(item.profile_photo_url)!"
-                :alt="item.name"
+                :alt="barbershopSearchTitle(item)"
               />
-              <div v-else class="suggestion-avatar-fallback">{{ item.name.charAt(0) }}</div>
+              <div v-else class="suggestion-avatar-fallback">
+                {{ barbershopSearchTitle(item).charAt(0) }}
+              </div>
             </ion-avatar>
             <div class="suggestion-text">
-              <strong>{{ item.name }}</strong>
-              <span>{{ item.username }}</span>
+              <strong>{{ barbershopSearchTitle(item) }}</strong>
+              <span>{{ item.name }}</span>
             </div>
           </li>
         </ul>
@@ -104,6 +106,7 @@ import {
 } from '@/services/api';
 import { ensureCameraPermission } from '@/services/cameraPermission';
 import { setPreferredBarbershop } from '@/services/storage';
+import { barbershopDisplayName } from '@/utils/barbershopDisplayName';
 
 const router = useRouter();
 const scannerHost = ref<HTMLElement | null>(null);
@@ -121,6 +124,10 @@ const searchQuery = computed(() => searchText.value.trim());
 let scanner: Html5Qrcode | null = null;
 let handled = false;
 let searchTimer: ReturnType<typeof setTimeout> | null = null;
+
+function barbershopSearchTitle(item: BarbershopSearchResult): string {
+  return barbershopDisplayName(item.username, item.name);
+}
 
 function normalizeSearchInput(raw: string): string {
   const trimmed = raw.trim();
@@ -201,13 +208,12 @@ watch(searchText, () => {
   scheduleSearch();
 });
 
-function selectSuggestion(item: BarbershopSearchResult) {
-  searchText.value = item.username;
-  selectedUsername.value = item.username;
+async function selectSuggestion(item: BarbershopSearchResult) {
   suggestions.value = [];
   searchAttempted.value = false;
   searchError.value = '';
   error.value = '';
+  await openBarbershop(item.username);
 }
 
 async function openBarbershop(username: string) {
@@ -222,7 +228,7 @@ async function openBarbershop(username: string) {
     const barbershop = await fetchBarbershop(username);
     await setPreferredBarbershop({
       username: barbershop.profile.username,
-      name: barbershop.profile.name,
+      name: barbershopDisplayName(barbershop.profile.username, barbershop.profile.name),
       profile_photo_url: resolveApiAssetUrl(barbershop.profile.profile_photo_url),
     });
     await stopWebScanner();
@@ -239,7 +245,7 @@ async function openBarbershop(username: string) {
 async function continueWithManual() {
   const username = resolveUsernameForContinue();
   if (!username) {
-    error.value = 'Selecione uma barbearia na lista ou informe o usuário após o link.';
+    error.value = 'Selecione uma barbearia na lista ou informe o link do perfil.';
     return;
   }
 
@@ -374,36 +380,27 @@ onBeforeUnmount(async () => {
   color: #6b7280;
 }
 
-.url-input-row {
-  display: flex;
-  align-items: stretch;
+.profile-url-block {
   border: 1px solid #d1d5db;
   border-radius: 10px;
   overflow: hidden;
   background: #fff;
 }
 
-.url-prefix {
-  display: flex;
-  align-items: center;
-  padding: 0 0.65rem;
+.profile-url-prefix {
+  margin: 0;
+  padding: 0.65rem 0.85rem;
   font-size: 0.82rem;
   color: #6b7280;
   background: #f3f4f6;
-  border-right: 1px solid #e5e7eb;
-  white-space: nowrap;
-  user-select: none;
-  max-width: 55%;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  border-bottom: 1px solid #e5e7eb;
+  word-break: break-all;
 }
 
-.url-suffix {
-  flex: 1;
-  min-width: 0;
-  --padding-start: 0.65rem;
-  --padding-end: 0.65rem;
-  --background: transparent;
+.search-input {
+  --padding-start: 0.85rem;
+  --padding-end: 0.85rem;
+  --background: #fff;
 }
 
 .suggestions {

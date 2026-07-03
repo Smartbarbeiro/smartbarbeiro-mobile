@@ -8,12 +8,11 @@
       <div v-else-if="profile" class="barbershop-profile-page">
         <div v-if="!checkoutStep" class="barbershop-profile-main">
           <ProfileAvatar
-            :name="profile.profile.name"
+            :name="barbershopNameForDisplay"
             :photo-url="profilePhotoUrl"
             size="lg"
           />
-          <h1 class="barbershop-profile-name">{{ profile.profile.name }}</h1>
-          <p class="barbershop-profile-meta">@{{ profile.profile.username }}</p>
+          <h1 class="barbershop-profile-name">{{ barbershopNameForDisplay }}</h1>
         </div>
 
         <section class="plan-builder">
@@ -97,13 +96,12 @@
 
               <div class="perfil-barbearia mt-4">
                 <ProfileAvatar
-                  :name="profile.profile.name"
+                  :name="barbershopNameForDisplay"
                   :photo-url="profilePhotoUrl"
                   size="md"
                 />
                 <div class="perfil-info">
-                  <h3 class="barbershop-profile-name mb-1">{{ profile.profile.name }}</h3>
-                  <p class="barbershop-profile-meta mb-0">@{{ profile.profile.username }}</p>
+                  <h3 class="barbershop-profile-name mb-1">{{ barbershopNameForDisplay }}</h3>
                 </div>
               </div>
 
@@ -260,6 +258,7 @@ import { initializeGoogleAuth, isGoogleAuthAvailable, signInWithGoogle } from '@
 import type { GoogleTokens } from '@/services/googleAuth';
 import { getToken, setAuth } from '@/services/storage';
 import type { BarbershopProfileResponse } from '@/types/api';
+import { barbershopDisplayName } from '@/utils/barbershopDisplayName';
 
 const props = defineProps<{ username: string }>();
 const router = useRouter();
@@ -290,6 +289,10 @@ const form = reactive({
 });
 
 const profilePhotoUrl = computed(() => resolveApiAssetUrl(profile.value?.profile.profile_photo_url));
+
+const barbershopNameForDisplay = computed(() =>
+  barbershopDisplayName(profile.value?.profile.username, profile.value?.profile.name),
+);
 
 const availableAddons = computed(() => profile.value?.service_plans.addons ?? []);
 

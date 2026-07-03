@@ -15,7 +15,7 @@
                 />
                 <div v-else class="avatar-fallback">{{ barbershopInitials }}</div>
               </ion-avatar>
-              <h1>{{ preferredBarbershop.name }}</h1>
+              <h1>{{ preferredBarbershopDisplayName }}</h1>
               <p>Acesse sua conta de cliente</p>
             </template>
             <template v-else>
@@ -112,6 +112,7 @@ import {
   setAuth,
   type PreferredBarbershop,
 } from '@/services/storage';
+import { barbershopDisplayName } from '@/utils/barbershopDisplayName';
 
 const router = useRouter();
 const route = useRoute();
@@ -127,8 +128,12 @@ const preferredBarbershopPhotoUrl = computed(() =>
   resolveApiAssetUrl(preferredBarbershop.value?.profile_photo_url),
 );
 
+const preferredBarbershopDisplayName = computed(() =>
+  barbershopDisplayName(preferredBarbershop.value?.username, preferredBarbershop.value?.name),
+);
+
 const barbershopInitials = computed(() => {
-  const name = preferredBarbershop.value?.name ?? '';
+  const name = preferredBarbershopDisplayName.value;
   return name
     .split(' ')
     .slice(0, 2)
