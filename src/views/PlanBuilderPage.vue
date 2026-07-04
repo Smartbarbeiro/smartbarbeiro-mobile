@@ -163,6 +163,9 @@
                   {{ googleLoading ? 'Conectando...' : 'Cadastrar com Google' }}
                 </button>
 
+                <p v-if="useGoogleSignup" class="oauth-divider mb-3">Conta Google conectada</p>
+                <p v-else-if="googleEnabled" class="oauth-divider mb-3">ou cadastre com e-mail</p>
+
                 <div class="sb-form-field">
                   <label class="sb-form-label" for="name">Nome</label>
                   <input id="name" v-model="form.name" class="sb-form-control" autocomplete="name" :readonly="useGoogleSignup" />
@@ -249,13 +252,15 @@ import {
   ApiError,
   fetchBarbershop,
   formatCurrency,
-  loginWithGoogle,
   register,
-  registerWithGoogle,
   resolveApiAssetUrl,
 } from '@/services/api';
-import { initializeGoogleAuth, isGoogleAuthAvailable, signInWithGoogle } from '@/services/googleAuth';
-import type { GoogleTokens } from '@/services/googleAuth';
+import {
+  completeGoogleBrowserRegistration,
+  initializeGoogleAuth,
+  isGoogleAuthAvailable,
+  signInWithGoogleBrowser,
+} from '@/services/googleAuth';
 import { getToken, setAuth } from '@/services/storage';
 import type { BarbershopProfileResponse } from '@/types/api';
 import { barbershopDisplayName } from '@/utils/barbershopDisplayName';
@@ -269,7 +274,7 @@ const submitting = ref(false);
 const googleLoading = ref(false);
 const googleEnabled = ref(false);
 const useGoogleSignup = ref(false);
-const googleTokens = ref<GoogleTokens | null>(null);
+const googleOAuthCode = ref('');
 const isAuthenticated = ref(false);
 const error = ref('');
 const profile = ref<BarbershopProfileResponse | null>(null);
@@ -365,19 +370,17 @@ async function startGoogleSignup() {
   error.value = '';
 
   try {
-    const tokens = await signInWithGoogle();
-    const response = await loginWithGoogle(tokens);
+    const response = await signInWithGoogleBrowser('register', `/barbearias/${props.username}`);
 
-    if ('status' in response && response.status === 'registration_required') {
-      googleTokens.value = tokens;
+    if ('status' in response) {
+      googleOAuthCode.value = response.oauthCode;
       useGoogleSignup.value = true;
-      form.name = response.google_user.name;
-      form.email = response.google_user.email;
+      form.name = response.name;
+      form.email = response.email;
       return;
     }
 
-    const authResponse = response as { token: string; user: import('@/types/api').ApiUser };
-    await setAuth(authResponse.token, authResponse.user);
+    await setAuth(response.token, response.user);
     isAuthenticated.value = true;
     await refreshTabBarVisibility();
     const toast = await toastController.create({
@@ -398,13 +401,13 @@ async function ensureRegistered(): Promise<boolean> {
   }
 
   if (useGoogleSignup.value) {
-    if (!googleTokens.value) {
+    if (!googleOAuthCode.value) {
       error.value = 'Conecte com Google antes de continuar.';
       return false;
     }
 
-    const auth = await registerWithGoogle({
-      ...googleTokens.value,
+    const auth = await completeGoogleBrowserRegistration({
+      oauthCode: googleOAuthCode.value,
       name: form.name,
       cpf: form.cpf,
       barbershop_username: props.username,
@@ -475,8 +478,15 @@ onIonViewWillEnter(() => {
 onMounted(async () => {
   isAuthenticated.value = !!(await getToken());
   await refreshTabBarVisibility();
-  googleEnabled.value = await isGoogleAuthAvailable();
-  await initializeGoogleAuth();
+
+  try {
+    googleEnabled.value = await isGoogleAuthAvailable();
+    if (googleEnabled.value) {
+      await initializeGoogleAuth();
+    }
+  } catch {
+    googleEnabled.value = false;
+  }
 
   try {
     profile.value = await fetchBarbershop(props.username);

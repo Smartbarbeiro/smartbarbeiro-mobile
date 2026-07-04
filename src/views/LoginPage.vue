@@ -104,8 +104,12 @@ import { logoGoogle, qrCodeOutline } from 'ionicons/icons';
 import logoImage from '@/assets/logo.png';
 import AppHeader from '@/components/AppHeader.vue';
 import { SUPPORT_WEBSITE_URL, supportPhoneDialUrl } from '@/config/support';
-import { ApiError, login, loginWithGoogle, resolveApiAssetUrl } from '@/services/api';
-import { initializeGoogleAuth, isGoogleAuthAvailable, signInWithGoogle } from '@/services/googleAuth';
+import { ApiError, login, resolveApiAssetUrl } from '@/services/api';
+import {
+  initializeGoogleAuth,
+  isGoogleAuthAvailable,
+  loginWithGoogleBrowser,
+} from '@/services/googleAuth';
 import {
   getLastLoginEmail,
   getPreferredBarbershop,
@@ -154,14 +158,19 @@ async function loadSavedLoginEmail() {
   password.value = '';
 }
 
-onMounted(async () => {
-  await Promise.all([loadPreferredBarbershop(), loadSavedLoginEmail()]);
+async function refreshGoogleAuth() {
   googleEnabled.value = await isGoogleAuthAvailable();
-  await initializeGoogleAuth();
+  if (googleEnabled.value) {
+    await initializeGoogleAuth();
+  }
+}
+
+onMounted(async () => {
+  await Promise.all([loadPreferredBarbershop(), loadSavedLoginEmail(), refreshGoogleAuth()]);
 });
 
 onIonViewWillEnter(async () => {
-  await Promise.all([loadPreferredBarbershop(), loadSavedLoginEmail()]);
+  await Promise.all([loadPreferredBarbershop(), loadSavedLoginEmail(), refreshGoogleAuth()]);
 });
 
 async function navigateAfterLogin() {
@@ -249,12 +258,15 @@ async function loginWithGoogleAccount() {
   error.value = '';
 
   try {
-    const tokens = await signInWithGoogle();
-    const response = await loginWithGoogle(tokens);
+    const authResponse = await loginWithGoogleBrowser();
+    await setAuth(authResponse.token, authResponse.user);
+    await navigateAfterLogin();
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Não foi possível entrar com Google.';
 
-    if ('status' in response && response.status === 'registration_required') {
+    if (message.includes('Conta Google nova')) {
       const toast = await toastController.create({
-        message: 'Conta Google nova. Escaneie o QR da barbearia para se cadastrar.',
+        message,
         duration: 4000,
       });
       await toast.present();
@@ -262,11 +274,7 @@ async function loginWithGoogleAccount() {
       return;
     }
 
-    const authResponse = response as { token: string; user: import('@/types/api').ApiUser };
-    await setAuth(authResponse.token, authResponse.user);
-    await navigateAfterLogin();
-  } catch (err) {
-    error.value = err instanceof ApiError ? err.message : err instanceof Error ? err.message : 'Não foi possível entrar com Google.';
+    error.value = err instanceof ApiError ? err.message : message;
   } finally {
     googleLoading.value = false;
   }

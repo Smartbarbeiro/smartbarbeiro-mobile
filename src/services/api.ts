@@ -82,10 +82,20 @@ async function performHttpRequest(
         data,
       });
 
-      const payload =
-        typeof response.data === 'object' && response.data !== null
-          ? (response.data as HttpPayload)
-          : {};
+      let payload: HttpPayload = {};
+
+      if (typeof response.data === 'string' && response.data !== '') {
+        try {
+          const parsed = JSON.parse(response.data) as unknown;
+          if (typeof parsed === 'object' && parsed !== null) {
+            payload = parsed as HttpPayload;
+          }
+        } catch {
+          payload = {};
+        }
+      } else if (typeof response.data === 'object' && response.data !== null) {
+        payload = response.data as HttpPayload;
+      }
 
       return {
         ok: response.status >= 200 && response.status < 300,
@@ -163,13 +173,20 @@ export async function loginWithGoogle(tokens: {
   accessToken?: string;
   idToken?: string;
 }): Promise<{ token: string; user: ApiUser } | GoogleRegistrationRequiredResponse> {
+  const body: Record<string, string> = {
+    device_name: 'smartbarbeiro-mobile',
+  };
+
+  // Prefer id_token (native OpenID). Only send access_token when no id_token.
+  if (tokens.idToken) {
+    body.id_token = tokens.idToken;
+  } else if (tokens.accessToken) {
+    body.access_token = tokens.accessToken;
+  }
+
   const options: RequestInit = {
     method: 'POST',
-    body: JSON.stringify({
-      access_token: tokens.accessToken,
-      id_token: tokens.idToken,
-      device_name: 'smartbarbeiro-mobile',
-    }),
+    body: JSON.stringify(body),
   };
   const headers = buildHeaders(options, false);
   const { ok, status, payload } = await performHttpRequest(`${API_URL}/api/v1/auth/google`, options, headers);
@@ -194,20 +211,29 @@ export async function loginWithGoogle(tokens: {
 export async function registerWithGoogle(payload: {
   accessToken?: string;
   idToken?: string;
+  oauthCode?: string;
   name: string;
   cpf: string;
   barbershop_username: string;
 }): Promise<{ token: string; user: ApiUser }> {
+  const body: Record<string, string> = {
+    name: payload.name,
+    cpf: payload.cpf,
+    barbershop_username: payload.barbershop_username,
+    device_name: 'smartbarbeiro-mobile',
+  };
+
+  if (payload.oauthCode) {
+    body.oauth_code = payload.oauthCode;
+  } else if (payload.idToken) {
+    body.id_token = payload.idToken;
+  } else if (payload.accessToken) {
+    body.access_token = payload.accessToken;
+  }
+
   return request('/api/v1/auth/google/register', {
     method: 'POST',
-    body: JSON.stringify({
-      access_token: payload.accessToken,
-      id_token: payload.idToken,
-      name: payload.name,
-      cpf: payload.cpf,
-      barbershop_username: payload.barbershop_username,
-      device_name: 'smartbarbeiro-mobile',
-    }),
+    body: JSON.stringify(body),
   });
 }
 

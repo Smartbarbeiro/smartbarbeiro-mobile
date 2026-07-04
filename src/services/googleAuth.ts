@@ -1,36 +1,34 @@
+import { App } from '@capacitor/app';
+import { Browser } from '@capacitor/browser';
 import { Capacitor } from '@capacitor/core';
-import { SocialLogin } from '@capgo/capacitor-social-login';
-import { fetchGoogleConfig } from './api';
+import { fetchGoogleConfig, fetchMe, getApiBaseUrl, registerWithGoogle } from './api';
+import { setAuth } from './storage';
+import type { ApiUser } from '@/types/api';
 
-export interface GoogleTokens {
-  accessToken?: string;
-  idToken?: string;
+export const MOBILE_OAUTH_SCHEME = 'smartbarbeiro://oauth/callback';
+
+export interface GoogleBrowserLoginResult {
+  token: string;
+  user: ApiUser;
 }
 
-let initialized = false;
+export interface GoogleBrowserRegistrationRequired {
+  status: 'registration_required';
+  oauthCode: string;
+  name: string;
+  email: string;
+}
+
+export type GoogleBrowserAuthResult = GoogleBrowserLoginResult | GoogleBrowserRegistrationRequired;
+
 let cachedClientId: string | null = null;
-let cachedIosClientId: string | null = null;
-
-function resolveIosClientId(): string | null {
-  if (cachedIosClientId) {
-    return cachedIosClientId;
-  }
-
-  const envIosClientId = import.meta.env.VITE_GOOGLE_IOS_CLIENT_ID as string | undefined;
-  if (envIosClientId) {
-    cachedIosClientId = envIosClientId;
-    return cachedIosClientId;
-  }
-
-  return null;
-}
 
 async function resolveClientId(): Promise<string | null> {
   if (cachedClientId) {
     return cachedClientId;
   }
 
-  const envClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined;
+  const envClientId = (import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined)?.trim();
   if (envClientId) {
     cachedClientId = envClientId;
     return cachedClientId;
@@ -43,88 +41,129 @@ async function resolveClientId(): Promise<string | null> {
       return cachedClientId;
     }
   } catch {
-    // API may be unreachable during offline dev
+    // ignore
   }
 
   return null;
 }
 
+function buildGoogleRedirectUrl(intent: 'login' | 'register', redirectPath?: string): string {
+  const params = new URLSearchParams({
+    intent,
+    mobile: '1',
+  });
+
+  if (redirectPath) {
+    params.set('redirect', redirectPath);
+  }
+
+  return `${getApiBaseUrl()}/auth/google/redirect?${params.toString()}`;
+}
+
+function parseCallbackParams(url: string): URLSearchParams {
+  const queryIndex = url.indexOf('?');
+  const query = queryIndex >= 0 ? url.slice(queryIndex + 1) : '';
+  return new URLSearchParams(query);
+}
+
 export async function isGoogleAuthAvailable(): Promise<boolean> {
-  const clientId = await resolveClientId();
-  return Boolean(clientId);
+  try {
+    if (Capacitor.isNativePlatform()) {
+      return true;
+    }
+
+    return Boolean(await resolveClientId());
+  } catch {
+    return false;
+  }
 }
 
 export async function initializeGoogleAuth(): Promise<void> {
-  if (initialized || !Capacitor.isNativePlatform()) {
-    return;
-  }
-
-  const clientId = await resolveClientId();
-  if (!clientId) {
-    return;
-  }
-
-  const googleConfig: {
-    webClientId: string;
-    mode: 'online';
-    iOSClientId?: string;
-    iOSServerClientId?: string;
-  } = {
-    webClientId: clientId,
-    mode: 'online',
-  };
-
-  if (Capacitor.getPlatform() === 'ios') {
-    const iosClientId = resolveIosClientId();
-    if (iosClientId) {
-      googleConfig.iOSClientId = iosClientId;
-      googleConfig.iOSServerClientId = clientId;
-    }
-  }
-
-  await SocialLogin.initialize({
-    google: googleConfig,
-  });
-
-  initialized = true;
+  // Browser OAuth needs no native SDK initialization.
 }
 
-export async function signInWithGoogle(): Promise<GoogleTokens> {
-  const clientId = await resolveClientId();
-  if (!clientId) {
-    throw new Error('Login com Google não está configurado.');
+export async function signInWithGoogleBrowser(
+  intent: 'login' | 'register' = 'login',
+  redirectPath?: string,
+): Promise<GoogleBrowserAuthResult> {
+  if (!Capacitor.isNativePlatform()) {
+    throw new Error('No celular, o login com Google abre no navegador do site.');
   }
 
-  if (Capacitor.isNativePlatform()) {
-    if (Capacitor.getPlatform() === 'ios' && !resolveIosClientId()) {
-      throw new Error('Configure VITE_GOOGLE_IOS_CLIENT_ID para login com Google no iPhone.');
-    }
+  return new Promise<GoogleBrowserAuthResult>((resolve, reject) => {
+    let settled = false;
 
-    await initializeGoogleAuth();
+    const finish = (handler: () => void) => {
+      if (settled) {
+        return;
+      }
 
-    const response = await SocialLogin.login({
-      provider: 'google',
-      options: {
-        scopes: ['email', 'profile'],
-      },
+      settled = true;
+      void listener.then((handle) => handle.remove());
+      handler();
+    };
+
+    const listener = App.addListener('appUrlOpen', async ({ url }) => {
+      if (!url.startsWith(MOBILE_OAUTH_SCHEME)) {
+        return;
+      }
+
+      await Browser.close();
+
+      const params = parseCallbackParams(url);
+      const status = params.get('status');
+
+      if (status === 'authenticated') {
+        const token = params.get('token');
+        if (!token) {
+          finish(() => reject(new Error('Login com Google não retornou token.')));
+          return;
+        }
+
+        try {
+          await setAuth(token, { email: null });
+          const { user } = await fetchMe();
+          await setAuth(token, user);
+          finish(() => resolve({ token, user }));
+        } catch (err) {
+          finish(() =>
+            reject(err instanceof Error ? err : new Error('Não foi possível concluir o login com Google.')),
+          );
+        }
+
+        return;
+      }
+
+      if (status === 'registration_required') {
+        const oauthCode = params.get('code');
+        if (!oauthCode) {
+          finish(() => reject(new Error('Cadastro com Google expirou. Tente novamente.')));
+          return;
+        }
+
+        finish(() =>
+          resolve({
+            status: 'registration_required',
+            oauthCode,
+            name: params.get('name') ?? '',
+            email: params.get('email') ?? '',
+          }),
+        );
+
+        return;
+      }
+
+      finish(() => reject(new Error(params.get('message') ?? 'Não foi possível entrar com Google.')));
     });
 
-    const result = response.result as {
-      idToken?: string | null;
-      accessToken?: { token?: string | null } | null;
-    };
-
-    return {
-      idToken: result.idToken ?? undefined,
-      accessToken: result.accessToken?.token ?? undefined,
-    };
-  }
-
-  return signInWithGoogleWeb(clientId);
+    void Browser.open({ url: buildGoogleRedirectUrl(intent, redirectPath) }).catch((err) => {
+      finish(() => reject(err instanceof Error ? err : new Error('Não foi possível abrir o Google.')));
+    });
+  });
 }
 
-function loadGoogleScript(): Promise<void> {
-  return new Promise((resolve, reject) => {
+async function signInWithGoogleWeb(clientId: string): Promise<{ accessToken: string }> {
+  await new Promise<void>((resolve, reject) => {
     if (document.getElementById('google-gsi-script')) {
       resolve();
       return;
@@ -139,10 +178,6 @@ function loadGoogleScript(): Promise<void> {
     script.onerror = () => reject(new Error('Não foi possível carregar o Google Sign-In.'));
     document.head.appendChild(script);
   });
-}
-
-async function signInWithGoogleWeb(clientId: string): Promise<GoogleTokens> {
-  await loadGoogleScript();
 
   return new Promise((resolve, reject) => {
     const google = (window as typeof window & { google?: any }).google;
@@ -165,5 +200,49 @@ async function signInWithGoogleWeb(clientId: string): Promise<GoogleTokens> {
     });
 
     tokenClient.requestAccessToken({ prompt: 'select_account' });
+  });
+}
+
+/** Web dev fallback only — native apps use signInWithGoogleBrowser(). */
+export async function signInWithGoogle(): Promise<{ accessToken?: string; idToken?: string }> {
+  const clientId = await resolveClientId();
+  if (!clientId) {
+    throw new Error('Login com Google não está configurado.');
+  }
+
+  if (Capacitor.isNativePlatform()) {
+    const result = await signInWithGoogleBrowser('login');
+    if ('status' in result) {
+      throw new Error('Conta Google nova. Escaneie o QR da barbearia para se cadastrar.');
+    }
+
+    throw new Error('Use loginWithGoogleBrowser() no app.');
+  }
+
+  const { accessToken } = await signInWithGoogleWeb(clientId);
+  return { accessToken };
+}
+
+export async function loginWithGoogleBrowser(): Promise<GoogleBrowserLoginResult> {
+  const result = await signInWithGoogleBrowser('login');
+
+  if ('status' in result) {
+    throw new Error('Conta Google nova. Escaneie o QR da barbearia para se cadastrar.');
+  }
+
+  return result;
+}
+
+export async function completeGoogleBrowserRegistration(payload: {
+  oauthCode: string;
+  name: string;
+  cpf: string;
+  barbershop_username: string;
+}): Promise<{ token: string; user: ApiUser }> {
+  return registerWithGoogle({
+    oauthCode: payload.oauthCode,
+    name: payload.name,
+    cpf: payload.cpf,
+    barbershop_username: payload.barbershop_username,
   });
 }
