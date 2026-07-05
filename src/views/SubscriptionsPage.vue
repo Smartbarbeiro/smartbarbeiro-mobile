@@ -10,7 +10,6 @@
       <ion-button v-if="username" expand="block" class="ion-margin-top" @click="goToPlan">
         Ir para a barbearia
       </ion-button>
-      <ClientTabBar v-if="showTabBar" />
     </ion-content>
   </ion-page>
 </template>
@@ -18,21 +17,20 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
-import { IonButton, IonContent, IonPage } from '@ionic/vue';
+import { IonButton, IonContent, IonPage, onIonViewWillEnter } from '@ionic/vue';
 import AppHeader from '@/components/AppHeader.vue';
-import ClientTabBar from '@/components/ClientTabBar.vue';
 import { useClientTabBar } from '@/composables/useClientTabBar';
 import { fetchMe } from '@/services/api';
 import { getStoredUser, getToken, setAuth } from '@/services/storage';
 import type { ApiUser } from '@/types/api';
 
 const router = useRouter();
-const { showTabBar } = useClientTabBar();
+const { showTabBar, refreshTabBarVisibility } = useClientTabBar();
 const user = ref<ApiUser | null>(null);
 
 const username = computed(() => user.value?.primary_barbershop_username ?? null);
 
-onMounted(async () => {
+async function loadAccount() {
   user.value = await getStoredUser<ApiUser>();
 
   try {
@@ -46,6 +44,16 @@ onMounted(async () => {
   } catch {
     // Keep cached session on network errors; router guard handles missing auth.
   }
+
+  await refreshTabBarVisibility();
+}
+
+onMounted(() => {
+  void loadAccount();
+});
+
+onIonViewWillEnter(() => {
+  void loadAccount();
 });
 
 async function goToPlan() {

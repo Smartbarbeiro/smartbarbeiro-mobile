@@ -1,22 +1,27 @@
-import { onMounted, ref } from 'vue';
+import { ref } from 'vue';
 import { getToken, getStoredUser } from '@/services/storage';
 import type { ApiUser } from '@/types/api';
 
-export function useClientTabBar() {
-  const showTabBar = ref(false);
+export const showClientTabBar = ref(false);
+export const isClientAuthenticated = ref(false);
 
-  async function refreshTabBarVisibility() {
-    const [token, user] = await Promise.all([
-      getToken(),
-      getStoredUser<ApiUser>(),
-    ]);
+export async function refreshClientSession() {
+  const token = await getToken();
+  isClientAuthenticated.value = !!token;
 
-    showTabBar.value = !!token && !!user?.primary_barbershop_username;
+  if (!token) {
+    showClientTabBar.value = false;
+    return;
   }
 
-  onMounted(() => {
-    void refreshTabBarVisibility();
-  });
+  const user = await getStoredUser<ApiUser>();
+  showClientTabBar.value = !!user?.primary_barbershop_username;
+}
 
-  return { showTabBar, refreshTabBarVisibility };
+export function useClientTabBar() {
+  return {
+    showTabBar: showClientTabBar,
+    isAuthenticated: isClientAuthenticated,
+    refreshTabBarVisibility: refreshClientSession,
+  };
 }

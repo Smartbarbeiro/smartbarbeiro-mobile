@@ -1,25 +1,35 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { cardOutline, cutOutline, homeOutline, settingsOutline } from 'ionicons/icons';
 import { IonIcon } from '@ionic/vue';
-import { getToken, getStoredUser } from '@/services/storage';
+import { refreshClientSession, showClientTabBar } from '@/composables/useClientTabBar';
+import { getStoredUser } from '@/services/storage';
 import type { ApiUser } from '@/types/api';
 
 const route = useRoute();
 const router = useRouter();
 const user = ref<ApiUser | null>(null);
-const isAuthenticated = ref(false);
 
-onMounted(async () => {
-  isAuthenticated.value = !!(await getToken());
+async function loadNavUser() {
   user.value = await getStoredUser<ApiUser>();
+  await refreshClientSession();
+}
+
+onMounted(() => {
+  void loadNavUser();
+});
+
+watch(showClientTabBar, (visible) => {
+  if (visible) {
+    void loadNavUser();
+  }
 });
 
 const username = computed(() => user.value?.primary_barbershop_username ?? null);
 
 const items = computed(() => {
-  if (!isAuthenticated.value || !username.value) {
+  if (!showClientTabBar.value || !username.value) {
     return [];
   }
 
@@ -28,26 +38,26 @@ const items = computed(() => {
   return [
     {
       key: 'home',
-      label: 'Home',
+      label: 'HOME',
       icon: homeOutline,
       routeName: 'PlanBuilder',
       params: { username: name },
     },
     {
       key: 'plan',
-      label: 'Plano',
+      label: 'PLANO',
       icon: cardOutline,
       routeName: 'Subscriptions',
     },
     {
       key: 'haircuts',
-      label: 'Cortes',
+      label: 'CORTES',
       icon: cutOutline,
       routeName: 'Haircuts',
     },
     {
       key: 'profile',
-      label: 'Config',
+      label: 'CONFIG',
       icon: settingsOutline,
       routeName: 'ProfileSettings',
     },
@@ -63,6 +73,10 @@ function isActive(item: (typeof items.value)[number]): boolean {
 }
 
 async function navigate(item: (typeof items.value)[number]) {
+  if (isActive(item)) {
+    return;
+  }
+
   if (item.params) {
     await router.push({ name: item.routeName, params: item.params });
     return;
@@ -73,7 +87,7 @@ async function navigate(item: (typeof items.value)[number]) {
 </script>
 
 <template>
-  <nav v-if="items.length" class="mobile-bottom-nav" aria-label="Navegação principal">
+  <nav v-if="items.length" class="mobile-bottom-nav" aria-label="Menu principal">
     <button
       v-for="item in items"
       :key="item.key"

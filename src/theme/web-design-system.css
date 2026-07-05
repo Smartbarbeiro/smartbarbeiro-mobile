@@ -567,12 +567,15 @@ ion-content {
   left: 0;
   right: 0;
   bottom: 0;
-  z-index: 1030;
+  z-index: 9999;
   display: flex;
   align-items: stretch;
+  justify-content: stretch;
+  gap: 0;
   min-height: var(--sb-tab-bar-height);
   padding: 0.55rem 0 calc(0.55rem + env(safe-area-inset-bottom, 0px));
-  background: #000;
+  background: #000000;
+  border-top: none;
 }
 
 .mobile-bottom-link {
@@ -586,10 +589,12 @@ ion-content {
   gap: 0.35rem;
   padding: 0.35rem 0.25rem;
   border: 0;
+  border-radius: 0;
   background: transparent;
-  color: #fff;
+  color: #ffffff;
   text-decoration: none;
   cursor: pointer;
+  transition: opacity 0.15s ease;
 }
 
 .mobile-bottom-link:not(:last-child)::after {
@@ -601,23 +606,39 @@ ion-content {
   border-right: 1px dashed rgba(255, 255, 255, 0.55);
 }
 
+.mobile-bottom-link:hover,
+.mobile-bottom-link:focus {
+  background: transparent;
+  color: #ffffff;
+  opacity: 0.82;
+}
+
 .mobile-bottom-link.active {
+  background: transparent;
+  color: #ffffff;
   opacity: 1;
 }
 
 .mobile-bottom-link:not(.active) {
-  opacity: 0.72;
+  opacity: 1;
 }
 
 .mobile-bottom-label {
   font-size: 0.6875rem;
   font-weight: 700;
+  line-height: 1;
   letter-spacing: 0.04em;
+  text-align: center;
   text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
 }
 
 .mobile-bottom-icon {
-  font-size: 1.5rem;
+  font-size: 1.85rem;
+  line-height: 1;
 }
 
 .sb-alert {

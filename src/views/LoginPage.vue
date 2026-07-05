@@ -113,9 +113,11 @@ import {
 import {
   getLastLoginEmail,
   getPreferredBarbershop,
+  getStoredUser,
   setAuth,
   type PreferredBarbershop,
 } from '@/services/storage';
+import type { ApiUser } from '@/types/api';
 import { barbershopDisplayName } from '@/utils/barbershopDisplayName';
 
 const router = useRouter();
@@ -178,6 +180,15 @@ async function navigateAfterLogin() {
 
   if (redirectUsername) {
     await router.replace({ name: 'PlanBuilder', params: { username: redirectUsername } });
+    return;
+  }
+
+  const storedUser = await getStoredUser<ApiUser>();
+  if (storedUser?.primary_barbershop_username) {
+    await router.replace({
+      name: 'PlanBuilder',
+      params: { username: storedUser.primary_barbershop_username },
+    });
     return;
   }
 

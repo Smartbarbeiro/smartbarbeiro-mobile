@@ -220,8 +220,6 @@
 
       <p v-else-if="error" class="sb-alert sb-alert-danger">{{ error }}</p>
 
-      <ClientTabBar v-if="showTabBar" />
-
       <WalletCheckoutSheet
         :is-open="paymentSheetOpen"
         :username="username"
@@ -243,7 +241,6 @@ import { useRouter } from 'vue-router';
 import { IonContent, IonPage, IonSpinner, onIonViewWillEnter, toastController } from '@ionic/vue';
 import cardImageUrl from '@/assets/images/cartao.svg';
 import AppHeader from '@/components/AppHeader.vue';
-import ClientTabBar from '@/components/ClientTabBar.vue';
 import ProfileAvatar from '@/components/ProfileAvatar.vue';
 import ServicePlanIcon from '@/components/ServicePlanIcon.vue';
 import WalletCheckoutSheet from '@/components/WalletCheckoutSheet.vue';
