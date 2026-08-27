@@ -28,7 +28,7 @@ on:
         default: '2'
 
 env:
-  VITE_API_URL: https://www.smartbarbeiro.com.br
+  VITE_API_URL: https://www.tesora.com.br
 
 jobs:
   release:

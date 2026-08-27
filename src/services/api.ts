@@ -161,7 +161,7 @@ async function request<T>(
 export async function login(email: string, password: string): Promise<{ token: string; user: ApiUser }> {
   return request('/api/v1/auth/login', {
     method: 'POST',
-    body: JSON.stringify({ email, password, device_name: 'smartbarbeiro-mobile' }),
+    body: JSON.stringify({ email, password, device_name: 'tesora-mobile' }),
   });
 }
 
@@ -174,7 +174,7 @@ export async function loginWithGoogle(tokens: {
   idToken?: string;
 }): Promise<{ token: string; user: ApiUser } | GoogleRegistrationRequiredResponse> {
   const body: Record<string, string> = {
-    device_name: 'smartbarbeiro-mobile',
+    device_name: 'tesora-mobile',
   };
 
   // Prefer id_token (native OpenID). Only send access_token when no id_token.
@@ -220,7 +220,7 @@ export async function registerWithGoogle(payload: {
     name: payload.name,
     cpf: payload.cpf,
     barbershop_username: payload.barbershop_username,
-    device_name: 'smartbarbeiro-mobile',
+    device_name: 'tesora-mobile',
   };
 
   if (payload.oauthCode) {
@@ -247,7 +247,7 @@ export async function register(payload: {
 }): Promise<{ token: string; user: ApiUser }> {
   return request('/api/v1/auth/register', {
     method: 'POST',
-    body: JSON.stringify({ ...payload, device_name: 'smartbarbeiro-mobile' }),
+    body: JSON.stringify({ ...payload, device_name: 'tesora-mobile' }),
   });
 }
 

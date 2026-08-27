@@ -1,6 +1,6 @@
 export const SUPPORT_WEBSITE_URL =
   (import.meta.env.VITE_SUPPORT_WEBSITE_URL as string | undefined)?.trim() ||
-  'https://www.smartbarbeiro.com.br';
+  'https://www.tesora.com.br';
 
 export const SUPPORT_PHONE =
   (import.meta.env.VITE_SUPPORT_PHONE as string | undefined)?.trim() || '';

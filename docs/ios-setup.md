@@ -71,7 +71,7 @@ npm run cap:sync:ios
 |-------|-----|
 | API requests fail on device | Use HTTPS public URL, not `127.0.0.1` |
 | Google login fails on iOS | Check iOS client ID, URL scheme in Info.plist, and bundle ID |
-| Camera not working | Settings → Smart Barbeiro → enable Camera |
+| Camera not working | Settings → Tesora → enable Camera |
 | `pod install` errors | Run on Mac: `cd ios/App && pod install` (if using CocoaPods workflow) |
 
 Capacitor 8 uses Swift Package Manager for plugins by default; `npx cap sync ios` updates `Package.swift` automatically.

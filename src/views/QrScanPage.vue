@@ -255,7 +255,7 @@ async function continueWithManual() {
 async function handleScanResult(decodedText: string) {
   const username = parseBarbershopUsernameFromQr(decodedText);
   if (!username) {
-    error.value = 'QR Code inválido. Use o QR da barbearia no app Smart Barbeiro.';
+    error.value = 'QR Code inválido. Use o QR da barbearia no app Tesora.';
     return;
   }
 
@@ -275,7 +275,7 @@ async function startNativeScan() {
 
     if (permission === 'denied') {
       error.value =
-        'Permissão de câmera negada. Abra Configurações > Smart Barbeiro > Permissões e habilite a câmera, ou use o campo abaixo.';
+        'Permissão de câmera negada. Abra Configurações > Tesora > Permissões e habilite a câmera, ou use o campo abaixo.';
       return;
     }
 

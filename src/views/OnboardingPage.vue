@@ -22,7 +22,7 @@
                   v-if="slide.logoImage"
                   :src="slide.logoImage"
                   class="slide-logo"
-                  alt="Smart Barbeiro"
+                  alt="Tesora"
                 />
                 <ion-icon v-else-if="slide.icon" :icon="slide.icon" class="slide-icon" />
                 <h1>{{ slide.title }}</h1>

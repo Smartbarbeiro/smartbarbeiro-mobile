@@ -5,7 +5,7 @@ import { fetchGoogleConfig, fetchMe, getApiBaseUrl, registerWithGoogle } from '.
 import { setAuth } from './storage';
 import type { ApiUser } from '@/types/api';
 
-export const MOBILE_OAUTH_SCHEME = 'smartbarbeiro://oauth/callback';
+export const MOBILE_OAUTH_SCHEME = 'tesora://oauth/callback';
 
 export interface GoogleBrowserLoginResult {
   token: string;

@@ -28,7 +28,7 @@
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="smartbarbeiro" android:host="oauth" android:pathPrefix="/callback" />
+                <data android:scheme="tesora" android:host="oauth" android:pathPrefix="/callback" />
             </intent-filter>
 
         </activity>

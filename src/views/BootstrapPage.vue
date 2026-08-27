@@ -2,7 +2,7 @@
   <ion-page>
     <ion-content class="bootstrap-content" fullscreen>
       <div class="bootstrap">
-        <img :src="logoImage" class="bootstrap-logo" alt="Smart Barbeiro" />
+        <img :src="logoImage" class="bootstrap-logo" alt="Tesora" />
         <ion-spinner class="bootstrap-spinner" name="circular" />
       </div>
     </ion-content>

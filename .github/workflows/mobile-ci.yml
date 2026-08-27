@@ -13,7 +13,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  VITE_API_URL: https://www.smartbarbeiro.com.br
+  VITE_API_URL: https://www.tesora.com.br
 
 jobs:
   web:

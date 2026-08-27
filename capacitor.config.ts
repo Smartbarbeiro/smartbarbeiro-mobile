@@ -4,7 +4,7 @@ const devServerUrl = process.env.CAP_DEV_SERVER_URL;
 
 const config: CapacitorConfig = {
   appId: 'com.smartbarbeiro.client',
-  appName: 'Smart Barbeiro',
+  appName: 'Tesora',
   webDir: 'dist',
   server: {
     androidScheme: 'http',

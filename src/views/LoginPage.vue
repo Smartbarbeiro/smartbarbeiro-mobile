@@ -19,8 +19,8 @@
               <p>Acesse sua conta de cliente</p>
             </template>
             <template v-else>
-              <img :src="logoImage" class="brand-logo" alt="Smart Barbeiro" />
-              <h1>Smart Barbeiro</h1>
+              <img :src="logoImage" class="brand-logo" alt="Tesora" />
+              <h1>Tesora</h1>
               <p>Acesse sua conta de cliente</p>
             </template>
           </div>
@@ -74,7 +74,7 @@
 
         <footer class="login-footer">
           <button type="button" class="footer-logo-button" @click="showSupportOptions">
-            <img :src="logoImage" class="footer-logo" alt="Smart Barbeiro" />
+            <img :src="logoImage" class="footer-logo" alt="Tesora" />
           </button>
         </footer>
       </div>

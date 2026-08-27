@@ -1,4 +1,4 @@
-# Smart Barbeiro — App do Cliente (Ionic 8)
+# Tesora — App do Cliente (Ionic 8)
 
 App mobile para clientes de barbearias: onboarding, leitura de QR Code, montagem de plano e cadastro com pagamento nativo via Stripe (cartão, Google Pay e Apple Pay).
 
@@ -18,6 +18,7 @@ Edite `VITE_API_URL` para apontar ao backend:
 
 | Ambiente | URL |
 |----------|-----|
+| Produção | `https://www.tesora.com.br` |
 | Local (browser) | `http://127.0.0.1:8000` |
 | ngrok | `https://seu-subdominio.ngrok-free.dev` |
 | Android emulator | `http://10.0.2.2:8000` |
